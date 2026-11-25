@@ -2,6 +2,7 @@ package net.rose.customPlugin.command;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.rose.customPlugin.item.FrostSpear;
 import net.rose.customPlugin.item.TideBlade;
 import net.rose.customPlugin.item.VolcanicAxe;
 import org.bukkit.Bukkit;
@@ -24,9 +25,10 @@ public final class WeaponCommand implements CommandExecutor, TabCompleter {
 
     private final Map<String, Supplier<ItemStack>> weapons = new LinkedHashMap<>();
 
-    public WeaponCommand(TideBlade tideBlade, VolcanicAxe volcanicAxe) {
+    public WeaponCommand(TideBlade tideBlade, VolcanicAxe volcanicAxe, FrostSpear frostSpear) {
         weapons.put("tideblade", tideBlade::create);
         weapons.put("volcanicaxe", volcanicAxe::create);
+        weapons.put("frostspear", frostSpear::create);
         // Register future weapons here: weapons.put("name", item::create);
     }
 
