@@ -52,6 +52,7 @@ public final class StunListener implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onAttack(EntityDamageByEntityEvent event) {
+        if (frost.isApplyingDamage()) return;
         if (event.getCause() != EntityDamageEvent.DamageCause.ENTITY_ATTACK) return;
         if (event.getDamager() instanceof Player attacker && frost.isStunned(attacker)) {
             event.setCancelled(true);

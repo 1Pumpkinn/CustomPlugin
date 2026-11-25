@@ -33,8 +33,16 @@ public final class FrostEffects {
     private final Map<UUID, BukkitTask> freezing = new HashMap<>();
     private final Map<UUID, Long> stunnedUntil = new HashMap<>();
 
+    /** True while our own freeze damage is being dealt, so listeners can tell it apart from a real stab. */
+    private boolean applyingDamage = false;
+
     public FrostEffects(JavaPlugin plugin) {
         this.plugin = plugin;
+    }
+
+    /** Whether the damage event currently being handled is the freeze's own damage pulse. */
+    public boolean isApplyingDamage() {
+        return applyingDamage;
     }
 
     // ------------------------------------------------------------------ Stun
@@ -81,11 +89,16 @@ public final class FrostEffects {
                 victim.setFreezeTicks(victim.getMaxFreezeTicks());
 
                 if (ticks >= FREEZE_FIRST_PULSE && (ticks - FREEZE_FIRST_PULSE) % FREEZE_PULSE_INTERVAL == 0) {
-                    victim.damage(FREEZE_DAMAGE,
-                            DamageSource.builder(DamageType.FREEZE)
-                                    .withCausingEntity(attacker)
-                                    .withDirectEntity(attacker)
-                                    .build());
+                    applyingDamage = true;
+                    try {
+                        victim.damage(FREEZE_DAMAGE,
+                                DamageSource.builder(DamageType.FREEZE)
+                                        .withCausingEntity(attacker)
+                                        .withDirectEntity(attacker)
+                                        .build());
+                    } finally {
+                        applyingDamage = false;
+                    }
                 }
 
                 if (ticks % 2 == 0) {

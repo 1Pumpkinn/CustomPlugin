@@ -67,6 +67,7 @@ public final class FrostSpearListener implements Listener {
     /** Passive: stabbing a player with the spear freezes them. Only melee hits count, so the freeze's own damage can't retrigger it. */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onStab(EntityDamageByEntityEvent event) {
+        if (frost.isApplyingDamage()) return; // the freeze's own damage pulse must not re-freeze (it can be reported as ENTITY_ATTACK)
         if (event.getCause() != EntityDamageEvent.DamageCause.ENTITY_ATTACK) return;
         if (!(event.getDamager() instanceof Player attacker)) return;
         if (!Targets.isValidPlayer(attacker, event.getEntity())) return;
