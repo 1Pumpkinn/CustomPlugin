@@ -16,7 +16,9 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /** Freezing (frost overlay, slowness, periodic freeze damage) and stun (can't move, attack or use items). */
@@ -32,6 +34,7 @@ public final class FrostEffects {
     private final JavaPlugin plugin;
     private final Map<UUID, BukkitTask> freezing = new HashMap<>();
     private final Map<UUID, Long> stunnedUntil = new HashMap<>();
+    private final Set<UUID> harmlessFreeze = new HashSet<>();
 
     /** True while our own freeze damage is being dealt, so listeners can tell it apart from a real stab. */
     private boolean applyingDamage = false;
@@ -43,6 +46,11 @@ public final class FrostEffects {
     /** Whether the damage event currently being handled is the freeze's own damage pulse. */
     public boolean isApplyingDamage() {
         return applyingDamage;
+    }
+
+    /** Whether the player is under a chill (frost overlay and slowness only), so any freeze damage on them should be cancelled. */
+    public boolean isHarmlessFreeze(Player player) {
+        return harmlessFreeze.contains(player.getUniqueId());
     }
 
     // ------------------------------------------------------------------ Stun
@@ -70,7 +78,21 @@ public final class FrostEffects {
      * Re-freezing a frozen player restarts the timer.
      */
     public void freeze(Player attacker, Player victim, int durationTicks) {
+        startFreeze(attacker, victim, durationTicks, true);
+    }
+
+    /**
+     * Chills the victim: the frost overlay is held at max every tick and they are slowed, but they
+     * take no freeze damage at all (neither ours nor vanilla's). Re-chilling restarts the timer.
+     */
+    public void chill(Player victim, int durationTicks) {
+        startFreeze(null, victim, durationTicks, false);
+    }
+
+    private void startFreeze(Player attacker, Player victim, int durationTicks, boolean damaging) {
         stopFreeze(victim);
+
+        if (!damaging) harmlessFreeze.add(victim.getUniqueId());
 
         victim.addPotionEffect(new PotionEffect(
                 PotionEffectType.SLOWNESS, durationTicks, FREEZE_SLOWNESS_AMPLIFIER, false, true, true));
@@ -88,7 +110,7 @@ public final class FrostEffects {
                 // Vanilla thaws a few ticks at a time when you're not in powder snow, so keep it full.
                 victim.setFreezeTicks(victim.getMaxFreezeTicks());
 
-                if (ticks >= FREEZE_FIRST_PULSE && (ticks - FREEZE_FIRST_PULSE) % FREEZE_PULSE_INTERVAL == 0) {
+                if (damaging && ticks >= FREEZE_FIRST_PULSE && (ticks - FREEZE_FIRST_PULSE) % FREEZE_PULSE_INTERVAL == 0) {
                     applyingDamage = true;
                     try {
                         victim.damage(FREEZE_DAMAGE,
@@ -114,6 +136,7 @@ public final class FrostEffects {
     }
 
     private void stopFreeze(Player victim) {
+        harmlessFreeze.remove(victim.getUniqueId());
         BukkitTask task = freezing.remove(victim.getUniqueId());
         if (task == null) return;
         task.cancel();
@@ -135,6 +158,7 @@ public final class FrostEffects {
         }
         freezing.values().forEach(BukkitTask::cancel);
         freezing.clear();
+        harmlessFreeze.clear();
         stunnedUntil.clear();
     }
 }

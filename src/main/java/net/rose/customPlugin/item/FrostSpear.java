@@ -27,7 +27,7 @@ public final class FrostSpear {
                 .decoration(TextDecoration.ITALIC, false));
         meta.lore(List.of(
                 ability("Offhand", "Dash forward, freezing and stunning every player you dash into"),
-                ability("Passive", "Stabbing a player freezes them")
+                ability("Passive", "Stabbing a player frosts and slows them")
         ));
         meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
         item.setItemMeta(meta);

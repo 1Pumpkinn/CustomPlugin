@@ -64,7 +64,7 @@ public final class FrostSpearListener implements Listener {
         dash(player);
     }
 
-    /** Passive: stabbing a player with the spear freezes them. Only melee hits count, so the freeze's own damage can't retrigger it. */
+    /** Passive: stabbing a player with the spear chills them (frost overlay and slowness, no damage). Only melee hits count, so the freeze's own damage can't retrigger it. */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onStab(EntityDamageByEntityEvent event) {
         if (frost.isApplyingDamage()) return; // the freeze's own damage pulse must not re-freeze (it can be reported as ENTITY_ATTACK)
@@ -73,7 +73,16 @@ public final class FrostSpearListener implements Listener {
         if (!Targets.isValidPlayer(attacker, event.getEntity())) return;
         if (!spear.isFrostSpear(attacker.getInventory().getItemInMainHand())) return;
 
-        frost.freeze(attacker, (Player) event.getEntity(), PASSIVE_FREEZE_TICKS);
+        frost.chill((Player) event.getEntity(), PASSIVE_FREEZE_TICKS);
+    }
+
+    /** A chilled player holds a full frost overlay, which makes vanilla deal freeze damage; the passive must not hurt. */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onFreezeDamage(EntityDamageEvent event) {
+        if (event.getCause() != EntityDamageEvent.DamageCause.FREEZE) return;
+        if (!(event.getEntity() instanceof Player player)) return;
+        if (frost.isApplyingDamage()) return;
+        if (frost.isHarmlessFreeze(player)) event.setCancelled(true);
     }
 
     @EventHandler
