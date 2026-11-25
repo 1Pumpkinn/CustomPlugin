@@ -1,0 +1,168 @@
+package net.rose.customPlugin.util;
+
+import net.kyori.adventure.bossbar.BossBar;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
+import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
+
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.UUID;
+
+/**
+ * Tracks per-player ability cooldowns and shows each active one as a boss bar
+ * that drains while the cooldown runs. Cooldowns survive relog; the bar is
+ * hidden on quit and restored on join.
+ */
+public final class CooldownBars {
+
+    private static final long UPDATE_TICKS = 2L;
+
+    private final JavaPlugin plugin;
+    private final Map<UUID, Map<String, Cooldown>> cooldowns = new HashMap<>();
+
+    public CooldownBars(JavaPlugin plugin) {
+        this.plugin = plugin;
+    }
+
+    /** Starts (or restarts) a cooldown and shows its boss bar. */
+    public void start(Player player, String id, String label, BossBar.Color color, long durationMs) {
+        Map<String, Cooldown> perPlayer = cooldowns.computeIfAbsent(player.getUniqueId(), k -> new HashMap<>());
+
+        Cooldown previous = perPlayer.remove(id);
+        if (previous != null) hide(player, previous);
+
+        Cooldown cooldown = new Cooldown(id, label, color, durationMs, System.currentTimeMillis() + durationMs);
+        perPlayer.put(id, cooldown);
+        show(player, cooldown);
+    }
+
+    public boolean isOnCooldown(Player player, String id) {
+        Map<String, Cooldown> perPlayer = cooldowns.get(player.getUniqueId());
+        if (perPlayer == null) return false;
+        Cooldown cooldown = perPlayer.get(id);
+        return cooldown != null && cooldown.endsAt > System.currentTimeMillis();
+    }
+
+    /** Milliseconds left on the cooldown, or 0 if it isn't running. */
+    public long remainingMillis(Player player, String id) {
+        Map<String, Cooldown> perPlayer = cooldowns.get(player.getUniqueId());
+        if (perPlayer == null) return 0;
+        Cooldown cooldown = perPlayer.get(id);
+        return cooldown == null ? 0 : Math.max(0, cooldown.endsAt - System.currentTimeMillis());
+    }
+
+    /** Hides all of the player's bars (e.g. on quit) but keeps the cooldowns running. */
+    public void hideAll(Player player) {
+        Map<String, Cooldown> perPlayer = cooldowns.get(player.getUniqueId());
+        if (perPlayer == null) return;
+        for (Cooldown cooldown : perPlayer.values()) {
+            hide(player, cooldown);
+        }
+    }
+
+    /** Re-shows bars for any cooldowns that are still running (e.g. on join). */
+    public void resume(Player player) {
+        Map<String, Cooldown> perPlayer = cooldowns.get(player.getUniqueId());
+        if (perPlayer == null) return;
+
+        long now = System.currentTimeMillis();
+        Iterator<Cooldown> it = perPlayer.values().iterator();
+        while (it.hasNext()) {
+            Cooldown cooldown = it.next();
+            if (cooldown.endsAt <= now) {
+                it.remove();
+            } else {
+                show(player, cooldown);
+            }
+        }
+        if (perPlayer.isEmpty()) cooldowns.remove(player.getUniqueId());
+    }
+
+    /** Hides every bar for online players; call from onDisable. */
+    public void shutdown() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            hideAll(player);
+        }
+    }
+
+    // ---------------------------------------------------------------- Internals
+
+    private void show(Player player, Cooldown cooldown) {
+        hide(player, cooldown);
+
+        long remaining = Math.max(0, cooldown.endsAt - System.currentTimeMillis());
+        cooldown.bar = BossBar.bossBar(title(cooldown, remaining), progress(cooldown, remaining),
+                cooldown.color, BossBar.Overlay.PROGRESS);
+        player.showBossBar(cooldown.bar);
+
+        cooldown.task = new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (!player.isOnline()) {
+                    hide(player, cooldown);
+                    return;
+                }
+
+                long left = cooldown.endsAt - System.currentTimeMillis();
+                if (left <= 0) {
+                    finish(player, cooldown);
+                    return;
+                }
+                cooldown.bar.name(title(cooldown, left));
+                cooldown.bar.progress(progress(cooldown, left));
+            }
+        }.runTaskTimer(plugin, UPDATE_TICKS, UPDATE_TICKS);
+    }
+
+    private void hide(Player player, Cooldown cooldown) {
+        if (cooldown.task != null) {
+            cooldown.task.cancel();
+            cooldown.task = null;
+        }
+        if (cooldown.bar != null) {
+            player.hideBossBar(cooldown.bar);
+            cooldown.bar = null;
+        }
+    }
+
+    private void finish(Player player, Cooldown cooldown) {
+        hide(player, cooldown);
+        Map<String, Cooldown> perPlayer = cooldowns.get(player.getUniqueId());
+        if (perPlayer == null) return;
+        perPlayer.remove(cooldown.id);
+        if (perPlayer.isEmpty()) cooldowns.remove(player.getUniqueId());
+    }
+
+    private static Component title(Cooldown cooldown, long remainingMs) {
+        long seconds = (remainingMs + 999) / 1000;
+        return Component.text(cooldown.label + " - " + seconds + "s", NamedTextColor.WHITE);
+    }
+
+    private static float progress(Cooldown cooldown, long remainingMs) {
+        return Math.max(0f, Math.min(1f, (float) remainingMs / cooldown.totalMs));
+    }
+
+    private static final class Cooldown {
+        private final String id;
+        private final String label;
+        private final BossBar.Color color;
+        private final long totalMs;
+        private final long endsAt;
+        private BossBar bar;
+        private BukkitTask task;
+
+        private Cooldown(String id, String label, BossBar.Color color, long totalMs, long endsAt) {
+            this.id = id;
+            this.label = label;
+            this.color = color;
+            this.totalMs = totalMs;
+            this.endsAt = endsAt;
+        }
+    }
+}

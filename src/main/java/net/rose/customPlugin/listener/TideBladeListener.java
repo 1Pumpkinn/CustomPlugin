@@ -1,8 +1,10 @@
 package net.rose.customPlugin.listener;
 
+import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.rose.customPlugin.item.TideBlade;
+import net.rose.customPlugin.util.CooldownBars;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
@@ -15,6 +17,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -31,10 +34,10 @@ import java.util.UUID;
 public final class TideBladeListener implements Listener {
 
     // --- Drown ---
-    private static final int DROWN_DURATION_TICKS = 200;     // 10s
+    private static final int DROWN_DURATION_TICKS = 160;     // 8s total
     private static final int AIR_DRAIN_TICKS = 60;           // air bar empties over the first 3s
     private static final int DROWN_DAMAGE_INTERVAL = 20;     // then damage once per second
-    private static final double DROWN_DAMAGE = 2.0;          // same as vanilla drowning
+    private static final double DROWN_DAMAGE = 1.5;          // 5 ticks of damage = 7.5 HP total
     private static final long DROWN_COOLDOWN_MS = 30_000;
 
     // --- Geyser ---
@@ -43,17 +46,20 @@ public final class TideBladeListener implements Listener {
     private static final int GEYSER_COLUMN_TICKS = 12;
     private static final long GEYSER_COOLDOWN_MS = 20_000;
 
+    private static final String DROWN_ID = "drown";
+    private static final String GEYSER_ID = "geyser";
+
     private final JavaPlugin plugin;
     private final TideBlade tideBlade;
+    private final CooldownBars cooldowns;
 
     private final Set<UUID> armed = new HashSet<>();
     private final Map<UUID, BukkitTask> drowning = new HashMap<>();
-    private final Map<UUID, Long> drownCooldowns = new HashMap<>();
-    private final Map<UUID, Long> geyserCooldowns = new HashMap<>();
 
-    public TideBladeListener(JavaPlugin plugin, TideBlade tideBlade) {
+    public TideBladeListener(JavaPlugin plugin, TideBlade tideBlade, CooldownBars cooldowns) {
         this.plugin = plugin;
         this.tideBlade = tideBlade;
+        this.cooldowns = cooldowns;
     }
 
     /**
@@ -83,7 +89,7 @@ public final class TideBladeListener implements Listener {
         if (!tideBlade.isTideBlade(attacker.getInventory().getItemInMainHand())) return;
 
         armed.remove(attacker.getUniqueId());
-        drownCooldowns.put(attacker.getUniqueId(), System.currentTimeMillis() + DROWN_COOLDOWN_MS);
+        cooldowns.start(attacker, DROWN_ID, "Drown", BossBar.Color.BLUE, DROWN_COOLDOWN_MS);
         startDrowning(attacker, victim);
     }
 
@@ -93,20 +99,22 @@ public final class TideBladeListener implements Listener {
     }
 
     @EventHandler
+    public void onJoin(PlayerJoinEvent event) {
+        cooldowns.resume(event.getPlayer());
+    }
+
+    @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         armed.remove(player.getUniqueId());
         stopDrowning(player);
+        cooldowns.hideAll(player);
     }
 
     // ------------------------------------------------------------------ Drown
 
     private void armDrown(Player player) {
-        long remaining = remainingSeconds(drownCooldowns, player);
-        if (remaining > 0) {
-            player.sendActionBar(Component.text("Drown on cooldown: " + remaining + "s", NamedTextColor.RED));
-            return;
-        }
+        if (cooldowns.isOnCooldown(player, DROWN_ID)) return; // boss bar already shows the time left
         if (!armed.add(player.getUniqueId())) {
             player.sendActionBar(Component.text("Drown is already ready", NamedTextColor.AQUA));
             return;
@@ -133,13 +141,13 @@ public final class TideBladeListener implements Listener {
                 victim.setRemainingAir(Math.max(0, max - (max * ticks / AIR_DRAIN_TICKS)));
 
                 if (ticks >= AIR_DRAIN_TICKS && (ticks - AIR_DRAIN_TICKS) % DROWN_DAMAGE_INTERVAL == 0) {
-                    // Drowning damage credited to the attacker, so kills count as theirs
+                    // Drowning damage credited to the attacker, so kills count as theirs.
+                    // The DROWN damage type already plays the drowning hurt sound itself.
                     victim.damage(DROWN_DAMAGE,
                             DamageSource.builder(DamageType.DROWN)
                                     .withCausingEntity(attacker)
                                     .withDirectEntity(attacker)
                                     .build());
-                    victim.getWorld().playSound(victim.getLocation(), Sound.ENTITY_PLAYER_HURT_DROWN, 1f, 1f);
                 }
 
                 if (ticks % 4 == 0) {
@@ -165,11 +173,7 @@ public final class TideBladeListener implements Listener {
     // ----------------------------------------------------------------- Geyser
 
     private void useGeyser(Player player) {
-        long remaining = remainingSeconds(geyserCooldowns, player);
-        if (remaining > 0) {
-            player.sendActionBar(Component.text("Geyser on cooldown: " + remaining + "s", NamedTextColor.RED));
-            return;
-        }
+        if (cooldowns.isOnCooldown(player, GEYSER_ID)) return; // boss bar already shows the time left
 
         Entity looking = player.getTargetEntity(GEYSER_RANGE);
         if (!(looking instanceof Player target)) {
@@ -177,12 +181,11 @@ public final class TideBladeListener implements Listener {
             return;
         }
 
-        geyserCooldowns.put(player.getUniqueId(), System.currentTimeMillis() + GEYSER_COOLDOWN_MS);
+        cooldowns.start(player, GEYSER_ID, "Geyser", BossBar.Color.WHITE, GEYSER_COOLDOWN_MS);
 
         Location base = target.getLocation();
         target.setVelocity(new Vector(0, GEYSER_LAUNCH_VELOCITY, 0));
         base.getWorld().playSound(base, Sound.ENTITY_GENERIC_SPLASH, 1.5f, 0.6f);
-        base.getWorld().playSound(base, Sound.ENTITY_DOLPHIN_SPLASH, 1.5f, 0.8f);
 
         new BukkitRunnable() {
             private int tick = 0;
@@ -200,12 +203,5 @@ public final class TideBladeListener implements Listener {
                 tick++;
             }
         }.runTaskTimer(plugin, 0L, 1L);
-    }
-
-    // ---------------------------------------------------------------- Helpers
-
-    private long remainingSeconds(Map<UUID, Long> cooldowns, Player player) {
-        long remaining = cooldowns.getOrDefault(player.getUniqueId(), 0L) - System.currentTimeMillis();
-        return remaining <= 0 ? 0 : (remaining + 999) / 1000;
     }
 }

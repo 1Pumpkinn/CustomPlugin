@@ -26,7 +26,7 @@ public final class TideBlade {
         meta.displayName(Component.text("Tide Blade", NamedTextColor.AQUA)
                 .decoration(TextDecoration.ITALIC, false));
         meta.lore(List.of(
-                ability("Offhand", "Drown the next player you hit for 10s"),
+                ability("Offhand", "Drown the next player you hit for 8s"),
                 ability("Crouch + Offhand", "Launch a player up with a geyser")
         ));
         meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
