@@ -7,3 +7,15 @@ api-version: '1.21.11'
 load: POSTWORLD
 
 authors: [ PumpkinDev ]
+
+commands:
+  weapon:
+    description: Give yourself (or another player) a custom weapon
+    usage: /weapon <name> [player]
+    aliases: [ weapons ]
+    permission: customplugin.weapon
+
+permissions:
+  customplugin.weapon:
+    description: Allows use of /weapon
+    default: op
