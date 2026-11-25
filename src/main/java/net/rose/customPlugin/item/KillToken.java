@@ -21,12 +21,13 @@ public final class KillToken {
     }
 
     public ItemStack create(int amount) {
-        ItemStack item = new ItemStack(Material.NETHER_STAR, amount);
+        ItemStack item = new ItemStack(Material.RED_DYE, amount);
         ItemMeta meta = item.getItemMeta();
         meta.displayName(Component.text("Kill Token", NamedTextColor.RED)
                 .decoration(TextDecoration.ITALIC, false));
-        meta.lore(List.of(Component.text("Dropped by a fallen player", NamedTextColor.GRAY)
+        meta.lore(List.of(Component.text("Dropped by a player", NamedTextColor.GRAY)
                 .decoration(TextDecoration.ITALIC, false)));
+        meta.setEnchantmentGlintOverride(true);
         meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
         item.setItemMeta(meta);
         return item;
