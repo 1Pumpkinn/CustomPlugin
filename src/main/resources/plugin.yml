@@ -1,0 +1,9 @@
+name: CustomPlugin
+version: '${version}'
+
+main: net.rose.customPlugin.CustomPlugin
+paper-plugin-loader: net.rose.customPlugin.CustomPluginLoader
+api-version: '1.21.11'
+load: POSTWORLD
+
+authors: [ PumpkinDev ]
