@@ -5,10 +5,12 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.rose.customPlugin.item.TideBlade;
 import net.rose.customPlugin.util.CooldownBars;
+import net.rose.customPlugin.util.Targets;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.damage.DamageSource;
 import org.bukkit.damage.DamageType;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -66,11 +68,12 @@ public final class TideBladeListener implements Listener {
         armDrown(player);
     }
 
-    /** The next player hit with the Tide Blade while armed starts drowning. */
+    /** The next target (player or mob) hit with the Tide Blade while armed starts drowning. */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onHit(EntityDamageByEntityEvent event) {
         if (!(event.getDamager() instanceof Player attacker)) return;
-        if (!(event.getEntity() instanceof Player victim)) return;
+        if (!Targets.isValidTarget(attacker, event.getEntity())) return;
+        LivingEntity victim = (LivingEntity) event.getEntity();
         if (!armed.contains(attacker.getUniqueId())) return;
         if (!tideBlade.isTideBlade(attacker.getInventory().getItemInMainHand())) return;
 
@@ -105,11 +108,11 @@ public final class TideBladeListener implements Listener {
             player.sendActionBar(Component.text("Drown is already ready", NamedTextColor.AQUA));
             return;
         }
-        player.sendActionBar(Component.text("Drown ready - hit a player", NamedTextColor.AQUA));
+        player.sendActionBar(Component.text("Drown ready - hit a target", NamedTextColor.AQUA));
         player.playSound(player.getLocation(), Sound.ENTITY_GENERIC_SPLASH, 1f, 0.8f);
     }
 
-    private void startDrowning(Player attacker, Player victim) {
+    private void startDrowning(Player attacker, LivingEntity victim) {
         stopDrowning(victim);
 
         BukkitTask task = new BukkitRunnable() {
@@ -117,7 +120,7 @@ public final class TideBladeListener implements Listener {
 
             @Override
             public void run() {
-                if (!victim.isOnline() || victim.isDead() || ticks >= DROWN_DURATION_TICKS) {
+                if (Targets.isGone(victim) || ticks >= DROWN_DURATION_TICKS) {
                     stopDrowning(victim);
                     return;
                 }
@@ -147,11 +150,11 @@ public final class TideBladeListener implements Listener {
         drowning.put(victim.getUniqueId(), task);
     }
 
-    private void stopDrowning(Player victim) {
+    private void stopDrowning(LivingEntity victim) {
         BukkitTask task = drowning.remove(victim.getUniqueId());
         if (task == null) return;
         task.cancel();
-        if (victim.isOnline() && !victim.isDead()) {
+        if (!Targets.isGone(victim)) {
             victim.setRemainingAir(victim.getMaximumAir());
         }
     }

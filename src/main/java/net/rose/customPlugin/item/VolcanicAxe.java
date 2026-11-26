@@ -31,7 +31,7 @@ public final class VolcanicAxe {
         meta.displayName(Component.text("Volcanic Axe", NamedTextColor.GOLD)
                 .decoration(TextDecoration.ITALIC, false));
         meta.lore(List.of(
-                ability("Offhand", "Look at a player to erupt the ground under them"),
+                ability("Offhand", "Look at a player or mob to erupt the ground under them"),
                 ability("Crouch + Offhand", "Spin the axe around you, burning anyone it hits")
         ));
         // Barely slower than a vanilla netherite axe (1.0 -> 0.95 attacks/s). Setting any attribute modifier

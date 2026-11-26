@@ -26,8 +26,8 @@ public final class TricksterBow {
         meta.displayName(Component.text("Trickster Bow", NamedTextColor.LIGHT_PURPLE)
                 .decoration(TextDecoration.ITALIC, false));
         meta.lore(List.of(
-                ability("Offhand", "Prime your next shot to fire 3 stronger arrows that bounce between players"),
-                ability("Passive", "Shots have a 10% chance to swap around the hit player's hotbar")
+                ability("Offhand", "Prime your next shot to fire 3 stronger arrows that bounce between players and mobs"),
+                ability("Passive", "Shots have a 10% chance to swap the hit player's held item with another hotbar slot")
         ));
         meta.setItemModel(key); // texture pack model: customplugin:<name>
         meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);

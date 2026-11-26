@@ -26,8 +26,8 @@ public final class FrostSpear {
         meta.displayName(Component.text("Frost Spear", NamedTextColor.AQUA)
                 .decoration(TextDecoration.ITALIC, false));
         meta.lore(List.of(
-                ability("Offhand", "Dash forward, freezing and stunning every player you dash into"),
-                ability("Passive", "Stabbing a player frosts and slows them")
+                ability("Offhand", "Dash forward, freezing and stunning every player and mob you dash into"),
+                ability("Passive", "Stabbing a player or mob frosts and slows them")
         ));
         meta.setItemModel(key); // texture pack model: customplugin:<name>
         meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);

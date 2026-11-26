@@ -30,7 +30,7 @@ public final class ZeusDisc {
         meta.lore(List.of(
                 ability("Right-click", "Throw the disc. It ricochets off walls and flies back to you"),
                 ability("Offhand", "Prime your next throw to strike everything it hits with lightning"),
-                ability("Passive", "Every hit chains lightning to nearby players and mobs for half a heart")
+                ability("Passive", "Hitting something near another target arcs sparks to nearby players and mobs for half a heart")
         ));
         meta.setEnchantmentGlintOverride(true);
         meta.setItemModel(key); // texture pack model: customplugin:<name>

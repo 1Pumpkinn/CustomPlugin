@@ -26,8 +26,8 @@ public final class MetalicMace {
         meta.displayName(Component.text("Metalic Mace", NamedTextColor.GRAY)
                 .decoration(TextDecoration.ITALIC, false));
         meta.lore(List.of(
-                ability("Offhand", "Pull a player in with a chain"),
-                ability("Chain", "The pulled player is slowed for 5s and can't jump or use wind charges")
+                ability("Offhand", "Pull a player or mob in with a chain"),
+                ability("Chain", "The pulled target is slowed for 5s and can't jump or use wind charges")
         ));
         meta.setItemModel(key); // texture pack model: customplugin:<name>
         meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);

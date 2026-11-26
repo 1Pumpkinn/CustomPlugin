@@ -10,6 +10,7 @@ import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -76,19 +77,19 @@ public final class FrostSpearListener implements Listener {
         if (frost.isApplyingDamage()) return; // the freeze's own damage pulse must not re-freeze (it can be reported as ENTITY_ATTACK)
         if (event.getCause() != EntityDamageEvent.DamageCause.ENTITY_ATTACK) return;
         if (!(event.getDamager() instanceof Player attacker)) return;
-        if (!Targets.isValidPlayer(attacker, event.getEntity())) return;
+        if (!Targets.isValidTarget(attacker, event.getEntity())) return;
         if (!spear.isFrostSpear(attacker.getInventory().getItemInMainHand())) return;
 
-        frost.chill((Player) event.getEntity(), PASSIVE_FREEZE_TICKS);
+        frost.chill((LivingEntity) event.getEntity(), PASSIVE_FREEZE_TICKS);
     }
 
     /** A chilled player holds a full frost overlay, which makes vanilla deal freeze damage; the passive must not hurt. */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onFreezeDamage(EntityDamageEvent event) {
         if (event.getCause() != EntityDamageEvent.DamageCause.FREEZE) return;
-        if (!(event.getEntity() instanceof Player player)) return;
+        if (!(event.getEntity() instanceof LivingEntity living)) return;
         if (frost.isApplyingDamage()) return;
-        if (frost.isHarmlessFreeze(player)) event.setCancelled(true);
+        if (frost.isHarmlessFreeze(living)) event.setCancelled(true);
     }
 
     @EventHandler
@@ -162,10 +163,10 @@ public final class FrostSpearListener implements Listener {
 
                 BoundingBox box = player.getBoundingBox().expand(DASH_HIT_EXPAND);
                 for (Entity entity : player.getWorld().getNearbyEntities(box)) {
-                    if (!Targets.isValidPlayer(player, entity)) continue;
+                    if (!Targets.isValidTarget(player, entity)) continue;
                     if (!hit.add(entity.getUniqueId())) continue;
 
-                    Player victim = (Player) entity;
+                    LivingEntity victim = (LivingEntity) entity;
                     frost.freeze(player, victim, DASH_FREEZE_TICKS);
                     frost.stun(victim, DASH_STUN_TICKS);
                     victim.getWorld().playSound(victim.getLocation(), Sound.BLOCK_GLASS_BREAK, 1f, 1.4f);

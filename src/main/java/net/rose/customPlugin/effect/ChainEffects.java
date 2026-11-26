@@ -12,6 +12,7 @@ import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Display;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -66,8 +67,8 @@ public final class ChainEffects {
     }
 
     /** Slows the target for 5s and stops them jumping or using wind charges for a few seconds. */
-    public void bind(Player caster, Player target) {
-        if (!Targets.isValidPlayer(caster, target)) return;
+    public void bind(Player caster, LivingEntity target) {
+        if (!Targets.isValidTarget(caster, target)) return;
         release(target);
 
         Bind bind = new Bind(caster);
@@ -85,7 +86,7 @@ public final class ChainEffects {
 
             @Override
             public void run() {
-                if (!target.isOnline() || target.isDead() || ticks >= BIND_TICKS) {
+                if (Targets.isGone(target) || ticks >= BIND_TICKS) {
                     release(target);
                     return;
                 }
@@ -102,27 +103,26 @@ public final class ChainEffects {
     /** Frees everyone; call from onDisable. */
     public void shutdown() {
         for (UUID id : new ArrayList<>(binds.keySet())) {
-            Player player = Bukkit.getPlayer(id);
-            if (player != null) release(player);
+            if (Bukkit.getEntity(id) instanceof LivingEntity living) release(living);
         }
         binds.clear();
     }
 
-    private void release(Player target) {
+    private void release(LivingEntity target) {
         Bind bind = binds.remove(target.getUniqueId());
         if (bind == null) return;
         if (bind.task != null) bind.task.cancel();
         unlockJump(target);
     }
 
-    private void lockJump(Player player) {
+    private void lockJump(LivingEntity player) {
         AttributeInstance jump = player.getAttribute(Attribute.JUMP_STRENGTH);
         if (jump == null || jump.getModifier(jumpLockKey) != null) return;
         jump.addTransientModifier(new AttributeModifier(
                 jumpLockKey, -1.0, AttributeModifier.Operation.ADD_SCALAR, EquipmentSlotGroup.ANY));
     }
 
-    private void unlockJump(Player player) {
+    private void unlockJump(LivingEntity player) {
         AttributeInstance jump = player.getAttribute(Attribute.JUMP_STRENGTH);
         if (jump != null) jump.removeModifier(jumpLockKey);
     }

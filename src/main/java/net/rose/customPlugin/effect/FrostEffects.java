@@ -2,12 +2,15 @@ package net.rose.customPlugin.effect;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.rose.customPlugin.util.Targets;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.damage.DamageSource;
 import org.bukkit.damage.DamageType;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
@@ -15,13 +18,17 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/** Freezing (frost overlay, slowness, periodic freeze damage) and stun (can't move, attack or use items). */
+/**
+ * Freezing (frost overlay, slowness, periodic freeze damage) and stun (can't move, attack or use items).
+ * Works on players and mobs; a stunned mob has its AI switched off for the duration.
+ */
 public final class FrostEffects {
 
     private static final double FREEZE_DAMAGE = 1.0;      // per pulse, ignores armor
@@ -48,19 +55,28 @@ public final class FrostEffects {
         return applyingDamage;
     }
 
-    /** Whether the player is under a chill (frost overlay and slowness only), so any freeze damage on them should be cancelled. */
-    public boolean isHarmlessFreeze(Player player) {
+    /** Whether the entity is under a chill (frost overlay and slowness only), so any freeze damage on it should be cancelled. */
+    public boolean isHarmlessFreeze(LivingEntity player) {
         return harmlessFreeze.contains(player.getUniqueId());
     }
 
     // ------------------------------------------------------------------ Stun
 
-    public void stun(Player victim, int ticks) {
+    public void stun(LivingEntity victim, int ticks) {
         stunnedUntil.put(victim.getUniqueId(), System.currentTimeMillis() + ticks * 50L);
-        victim.sendActionBar(Component.text("Stunned!", NamedTextColor.AQUA));
+        if (victim instanceof Player player) {
+            player.sendActionBar(Component.text("Stunned!", NamedTextColor.AQUA));
+        } else if (victim instanceof Mob mob) {
+            // No AI: it can't walk, target or attack. Gravity and knockback still work.
+            mob.setAware(false);
+            plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+                // A newer stun may have extended it; only the last one switches the AI back on.
+                if (mob.isValid() && !isStunned(mob)) mob.setAware(true);
+            }, ticks + 1L);
+        }
     }
 
-    public boolean isStunned(Player player) {
+    public boolean isStunned(LivingEntity player) {
         Long until = stunnedUntil.get(player.getUniqueId());
         if (until == null) return false;
         if (until <= System.currentTimeMillis()) {
@@ -77,7 +93,7 @@ public final class FrostEffects {
      * take {@link #FREEZE_DAMAGE} (freeze damage, credited to the attacker) once per second.
      * Re-freezing a frozen player restarts the timer.
      */
-    public void freeze(Player attacker, Player victim, int durationTicks) {
+    public void freeze(Player attacker, LivingEntity victim, int durationTicks) {
         startFreeze(attacker, victim, durationTicks, true);
     }
 
@@ -85,11 +101,11 @@ public final class FrostEffects {
      * Chills the victim: the frost overlay is held at max every tick and they are slowed, but they
      * take no freeze damage at all (neither ours nor vanilla's). Re-chilling restarts the timer.
      */
-    public void chill(Player victim, int durationTicks) {
+    public void chill(LivingEntity victim, int durationTicks) {
         startFreeze(null, victim, durationTicks, false);
     }
 
-    private void startFreeze(Player attacker, Player victim, int durationTicks, boolean damaging) {
+    private void startFreeze(Player attacker, LivingEntity victim, int durationTicks, boolean damaging) {
         stopFreeze(victim);
 
         if (!damaging) harmlessFreeze.add(victim.getUniqueId());
@@ -102,7 +118,7 @@ public final class FrostEffects {
 
             @Override
             public void run() {
-                if (!victim.isOnline() || victim.isDead() || ticks >= durationTicks) {
+                if (Targets.isGone(victim) || ticks >= durationTicks) {
                     stopFreeze(victim);
                     return;
                 }
@@ -135,12 +151,12 @@ public final class FrostEffects {
         freezing.put(victim.getUniqueId(), task);
     }
 
-    private void stopFreeze(Player victim) {
+    private void stopFreeze(LivingEntity victim) {
         harmlessFreeze.remove(victim.getUniqueId());
         BukkitTask task = freezing.remove(victim.getUniqueId());
         if (task == null) return;
         task.cancel();
-        if (victim.isOnline()) victim.setFreezeTicks(0);
+        if (victim.isValid()) victim.setFreezeTicks(0);
     }
 
     // --------------------------------------------------------------- Cleanup
@@ -153,8 +169,11 @@ public final class FrostEffects {
 
     /** Stops every freeze; call from onDisable. */
     public void shutdown() {
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            stopFreeze(player);
+        for (UUID id : new ArrayList<>(freezing.keySet())) {
+            if (Bukkit.getEntity(id) instanceof LivingEntity living) stopFreeze(living);
+        }
+        for (UUID id : new ArrayList<>(stunnedUntil.keySet())) {
+            if (Bukkit.getEntity(id) instanceof Mob mob) mob.setAware(true);
         }
         freezing.values().forEach(BukkitTask::cancel);
         freezing.clear();

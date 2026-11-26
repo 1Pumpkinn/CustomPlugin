@@ -194,7 +194,7 @@ public final class EruptionEffect {
         Location column = center.clone().add(0, COLUMN_HEIGHT / 2, 0);
         for (LivingEntity e : column.getNearbyLivingEntities(
                 RADIUS + 1.0, COLUMN_HEIGHT / 2 + 1.0, RADIUS + 1.0)) {
-            if (!Targets.isValidPlayer(caster, e)) continue;
+            if (!Targets.isValidTarget(caster, e)) continue;
             if (!insideBlast(center, e)) continue;
 
             double dx = e.getLocation().getX() - center.getX();

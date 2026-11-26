@@ -11,6 +11,7 @@ import net.rose.customPlugin.util.Targets;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -46,7 +47,7 @@ public final class VolcanicAxeListener implements Listener {
 
     /**
      * Offhand key (F) while holding the Volcanic Axe:
-     * normal = Eruption under the player you look at, crouching = spinning axe.
+     * normal = Eruption under the target you look at, crouching = spinning axe.
      */
     @EventHandler(ignoreCancelled = true)
     public void onSwapHand(PlayerSwapHandItemsEvent event) {
@@ -84,9 +85,9 @@ public final class VolcanicAxeListener implements Listener {
     private void useEruption(Player player) {
         if (cooldowns.isOnCooldown(player, ERUPTION_ID)) return; // boss bar already shows the time left
 
-        Player target = findTarget(player);
+        LivingEntity target = findTarget(player);
         if (target == null) {
-            player.sendActionBar(Component.text("Look at a player to use Eruption", NamedTextColor.RED));
+            player.sendActionBar(Component.text("Look at a target to use Eruption", NamedTextColor.RED));
             return; // failed cast stays free (no cooldown)
         }
 
@@ -101,8 +102,8 @@ public final class VolcanicAxeListener implements Listener {
         spin.start(player);
     }
 
-    /** First valid player in the line of sight, stopped by walls. */
-    private Player findTarget(Player player) {
+    /** First valid target (player or mob) in the line of sight, stopped by walls. */
+    private LivingEntity findTarget(Player player) {
         World world = player.getWorld();
         Location eye = player.getEyeLocation();
         Vector dir = eye.getDirection();
@@ -111,7 +112,7 @@ public final class VolcanicAxeListener implements Listener {
         double maxDistance = blocks == null ? ERUPTION_RANGE : blocks.getHitPosition().distance(eye.toVector());
 
         RayTraceResult hit = world.rayTraceEntities(eye, dir, maxDistance, RAY_SIZE,
-                e -> Targets.isValidPlayer(player, e));
-        return hit != null && hit.getHitEntity() instanceof Player target ? target : null;
+                e -> Targets.isValidTarget(player, e));
+        return hit != null && hit.getHitEntity() instanceof LivingEntity target ? target : null;
     }
 }

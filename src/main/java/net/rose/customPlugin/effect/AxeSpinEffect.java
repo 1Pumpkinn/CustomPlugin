@@ -27,7 +27,7 @@ import java.util.UUID;
 
 /**
  * A flaming axe that orbits the caster like a rotating arm (handle towards you, head outward),
- * damaging and igniting every player it touches.
+ * damaging and igniting every player and mob it touches.
  *
  * <p>The display entity just follows the caster (always yaw 0 / pitch 0, so looking up or down
  * never tilts it). The orbit itself is done with the display's transformation, which the client
@@ -195,7 +195,7 @@ public final class AxeSpinEffect {
 
     private void hitAround(Player caster, Location at, Map<UUID, Integer> lastHit, int ticks) {
         for (LivingEntity entity : at.getNearbyLivingEntities(HIT_RADIUS, HIT_RADIUS, HIT_RADIUS)) {
-            if (!Targets.isValidPlayer(caster, entity)) continue;
+            if (!Targets.isValidTarget(caster, entity)) continue;
 
             Integer last = lastHit.get(entity.getUniqueId());
             if (last != null && ticks - last < HIT_INTERVAL_TICKS) continue;

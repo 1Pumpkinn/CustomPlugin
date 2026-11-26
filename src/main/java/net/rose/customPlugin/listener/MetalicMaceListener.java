@@ -11,6 +11,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.WindCharge;
 import org.bukkit.event.EventHandler;
@@ -92,8 +93,8 @@ public final class MetalicMaceListener implements Listener {
         if (cooldowns.isOnCooldown(player, PULL_ID)) return; // boss bar already shows the time left
 
         Entity looking = player.getTargetEntity(PULL_RANGE);
-        if (!(looking instanceof Player target) || !Targets.isValidPlayer(player, target)) {
-            player.sendActionBar(Component.text("Look at a player to use Chain Pull", NamedTextColor.RED));
+        if (!(looking instanceof LivingEntity target) || !Targets.isValidTarget(player, target)) {
+            player.sendActionBar(Component.text("Look at a target to use Chain Pull", NamedTextColor.RED));
             return;
         }
 
@@ -107,7 +108,7 @@ public final class MetalicMaceListener implements Listener {
 
             @Override
             public void run() {
-                if (!player.isOnline() || player.isDead() || !target.isOnline() || target.isDead()
+                if (!player.isOnline() || player.isDead() || Targets.isGone(target)
                         || !player.getWorld().equals(target.getWorld())) {
                     link.remove();
                     cancel();

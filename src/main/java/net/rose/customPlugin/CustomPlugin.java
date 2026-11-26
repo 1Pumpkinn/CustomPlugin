@@ -13,10 +13,12 @@ import net.rose.customPlugin.item.TricksterBow;
 import net.rose.customPlugin.item.TideBlade;
 import net.rose.customPlugin.item.VolcanicAxe;
 import net.rose.customPlugin.item.ZeusDisc;
+import net.rose.customPlugin.listener.DroppedItemGlow;
 import net.rose.customPlugin.listener.EgapListener;
 import net.rose.customPlugin.listener.FrostSpearListener;
 import net.rose.customPlugin.listener.KillTokenListener;
 import net.rose.customPlugin.listener.LungeCooldown;
+import net.rose.customPlugin.listener.MaceDamageCap;
 import net.rose.customPlugin.listener.MetalicMaceListener;
 import net.rose.customPlugin.listener.StunListener;
 import net.rose.customPlugin.listener.TideBladeListener;
@@ -73,6 +75,8 @@ public final class CustomPlugin extends JavaPlugin {
         this.zeusDiscListener = new ZeusDiscListener(this, zeusDisc, cooldownBars, new ZeusLightning(this));
         getServer().getPluginManager().registerEvents(zeusDiscListener, this);
         new LungeCooldown(this).register();
+        getServer().getPluginManager().registerEvents(new MaceDamageCap(), this);
+        getServer().getPluginManager().registerEvents(new DroppedItemGlow(this), this);
         getServer().getPluginManager().registerEvents(
                 new VolcanicAxeListener(volcanicAxe, cooldownBars, eruptionEffect, axeSpinEffect), this);
 

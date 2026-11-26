@@ -20,6 +20,12 @@ public final class Targets {
         return mode == GameMode.SURVIVAL || mode == GameMode.ADVENTURE;
     }
 
+    /** True once the entity can no longer be affected: an offline or dead player, or a removed or dead mob. */
+    public static boolean isGone(LivingEntity entity) {
+        if (entity instanceof Player player) return !player.isOnline() || player.isDead();
+        return !entity.isValid() || entity.isDead();
+    }
+
     /** Like {@link #isValidPlayer}, but mobs count too (not armor stands, and not the caster's own tamed pets). */
     public static boolean isValidTarget(Player caster, Entity entity) {
         if (entity instanceof Player player) return isValidPlayer(caster, player);

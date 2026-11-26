@@ -13,6 +13,7 @@ import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.entity.AbstractArrow;
 import org.bukkit.entity.Arrow;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -31,10 +32,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -128,8 +126,8 @@ public final class TricksterBowListener implements Listener {
         Integer bounces = data.get(bouncesKey, PersistentDataType.INTEGER);
         if (bounces == null) return;
 
-        if (!(event.getHitEntity() instanceof Player victim)) return;
-        if (!(arrow.getShooter() instanceof Player shooter) || !Targets.isValidPlayer(shooter, victim)) return;
+        if (!(event.getHitEntity() instanceof LivingEntity victim)) return;
+        if (!(arrow.getShooter() instanceof Player shooter) || !Targets.isValidTarget(shooter, victim)) return;
 
         String lastVictim = data.get(lastVictimKey, PersistentDataType.STRING);
         if (victim.getUniqueId().toString().equals(lastVictim)) {
@@ -137,7 +135,10 @@ public final class TricksterBowListener implements Listener {
             return;
         }
 
-        if (ThreadLocalRandom.current().nextDouble() < SWAP_CHANCE) shuffleHotbar(victim);
+        // Only players have a hotbar to swap; mobs still get hit and the arrow still bounces on.
+        if (victim instanceof Player target && ThreadLocalRandom.current().nextDouble() < SWAP_CHANCE) {
+            swapHeldSlot(target);
+        }
 
         if (bounces > 0) {
             double damage = arrow.getDamage();
@@ -174,14 +175,14 @@ public final class TricksterBowListener implements Listener {
         player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1.6f);
     }
 
-    private void bounce(Player shooter, Player from, int bouncesLeft, double damage, boolean critical) {
-        if (!shooter.isOnline() || !from.isOnline()) return;
+    private void bounce(Player shooter, LivingEntity from, int bouncesLeft, double damage, boolean critical) {
+        if (!shooter.isOnline() || !from.isValid()) return;
 
-        Player next = nearestTarget(shooter, from);
+        LivingEntity next = nearestTarget(shooter, from);
         if (next == null) return;
 
-        Location start = from.getLocation().add(0, 1.0, 0);
-        Vector direction = next.getLocation().add(0, 1.0, 0).toVector().subtract(start.toVector());
+        Location start = from.getLocation().add(0, chest(from), 0);
+        Vector direction = next.getLocation().add(0, chest(next), 0).toVector().subtract(start.toVector());
         double distance = direction.length();
         if (distance < 0.1) return;
 
@@ -208,18 +209,18 @@ public final class TricksterBowListener implements Listener {
     }
 
     /** Steers a bounced arrow onto its target for a short while so it still connects if the target moves. */
-    private void home(Arrow arrow, Player target) {
+    private void home(Arrow arrow, LivingEntity target) {
         new BukkitRunnable() {
             private int ticks = 0;
 
             @Override
             public void run() {
                 if (!arrow.isValid() || arrow.isInBlock() || arrow.isOnGround()
-                        || !target.isOnline() || target.isDead() || ticks++ >= HOMING_TICKS) {
+                        || Targets.isGone(target) || ticks++ >= HOMING_TICKS) {
                     cancel();
                     return;
                 }
-                Vector toTarget = target.getLocation().add(0, 1.0, 0).toVector()
+                Vector toTarget = target.getLocation().add(0, chest(target), 0).toVector()
                         .subtract(arrow.getLocation().toVector());
                 if (toTarget.lengthSquared() < 0.01) return;
                 toTarget.normalize();
@@ -229,12 +230,17 @@ public final class TricksterBowListener implements Listener {
         }.runTaskTimer(plugin, 1L, 1L);
     }
 
-    /** Closest other player (not the shooter, not the one just hit) within range and in line of sight. */
-    private Player nearestTarget(Player shooter, Player from) {
-        Player best = null;
+    /** Height to aim at on an entity: about chest level (1.0 for a player). */
+    private static double chest(LivingEntity entity) {
+        return entity.getHeight() * 0.55;
+    }
+
+    /** Closest other target, player or mob (not the shooter, not the one just hit), within range and in line of sight. */
+    private LivingEntity nearestTarget(Player shooter, LivingEntity from) {
+        LivingEntity best = null;
         double bestDistance = BOUNCE_RANGE * BOUNCE_RANGE;
-        for (Player candidate : from.getWorld().getPlayers()) {
-            if (candidate.equals(from) || !Targets.isValidPlayer(shooter, candidate)) continue;
+        for (LivingEntity candidate : from.getWorld().getNearbyLivingEntities(from.getLocation(), BOUNCE_RANGE)) {
+            if (candidate.equals(from) || !Targets.isValidTarget(shooter, candidate)) continue;
 
             double distance = from.getLocation().distanceSquared(candidate.getLocation());
             if (distance > bestDistance || !from.hasLineOfSight(candidate)) continue;
@@ -245,7 +251,7 @@ public final class TricksterBowListener implements Listener {
         return best;
     }
 
-    private void tag(Arrow arrow, int bounces, Player lastVictim) {
+    private void tag(Arrow arrow, int bounces, LivingEntity lastVictim) {
         PersistentDataContainer data = arrow.getPersistentDataContainer();
         data.set(bouncesKey, PersistentDataType.INTEGER, bounces);
         if (lastVictim != null) {
@@ -253,17 +259,18 @@ public final class TricksterBowListener implements Listener {
         }
     }
 
-    /** Passive: the hit player's nine hotbar slots get shuffled around. */
-    private void shuffleHotbar(Player victim) {
+    /** Passive: the slot the hit player is holding trades places with one other hotbar slot. Nothing else moves. */
+    private void swapHeldSlot(Player victim) {
         PlayerInventory inventory = victim.getInventory();
-        List<ItemStack> hotbar = new ArrayList<>();
-        for (int slot = 0; slot < 9; slot++) {
-            hotbar.add(inventory.getItem(slot));
-        }
-        Collections.shuffle(hotbar);
-        for (int slot = 0; slot < 9; slot++) {
-            inventory.setItem(slot, hotbar.get(slot));
-        }
+        int held = inventory.getHeldItemSlot();
+
+        // Pick one of the other eight slots.
+        int other = ThreadLocalRandom.current().nextInt(8);
+        if (other >= held) other++;
+
+        ItemStack heldItem = inventory.getItem(held);
+        inventory.setItem(held, inventory.getItem(other));
+        inventory.setItem(other, heldItem);
         victim.updateInventory();
 
         victim.playSound(victim.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 0.6f, 1.4f);
