@@ -5,12 +5,8 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.rose.customPlugin.item.TideBlade;
 import net.rose.customPlugin.util.CooldownBars;
-import net.rose.customPlugin.util.Targets;
-import org.bukkit.FluidCollisionMode;
-import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
-import org.bukkit.World;
 import org.bukkit.damage.DamageSource;
 import org.bukkit.damage.DamageType;
 import org.bukkit.entity.Player;
@@ -25,8 +21,6 @@ import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
-import org.bukkit.util.RayTraceResult;
-import org.bukkit.util.Vector;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -43,15 +37,7 @@ public final class TideBladeListener implements Listener {
     private static final double DROWN_DAMAGE = 1.5;          // 5 ticks of damage = 7.5 HP total
     private static final long DROWN_COOLDOWN_MS = 30_000;
 
-    // --- Geyser ---
-    private static final int GEYSER_RANGE = 20;
-    private static final double GEYSER_RAY_SIZE = 1.0;       // how far off your crosshair a player can be and still count
-    private static final double GEYSER_LAUNCH_VELOCITY = 1.2;
-    private static final int GEYSER_COLUMN_TICKS = 12;
-    private static final long GEYSER_COOLDOWN_MS = 20_000;
-
     private static final String DROWN_ID = "drown";
-    private static final String GEYSER_ID = "geyser";
 
     private final JavaPlugin plugin;
     private final TideBlade tideBlade;
@@ -68,7 +54,7 @@ public final class TideBladeListener implements Listener {
 
     /**
      * Offhand key (F) while holding the Tide Blade:
-     * normal = arm Drown, crouching = Geyser. The swap itself is always cancelled.
+     * arms Drown. The swap itself is always cancelled.
      */
     @EventHandler(ignoreCancelled = true)
     public void onSwapHand(PlayerSwapHandItemsEvent event) {
@@ -77,11 +63,7 @@ public final class TideBladeListener implements Listener {
 
         event.setCancelled(true);
 
-        if (player.isSneaking()) {
-            useGeyser(player);
-        } else {
-            armDrown(player);
-        }
+        armDrown(player);
     }
 
     /** The next player hit with the Tide Blade while armed starts drowning. */
@@ -172,54 +154,5 @@ public final class TideBladeListener implements Listener {
         if (victim.isOnline() && !victim.isDead()) {
             victim.setRemainingAir(victim.getMaximumAir());
         }
-    }
-
-    // ----------------------------------------------------------------- Geyser
-
-    /** First valid player near the line of sight (generous aim), stopped by walls. */
-    private static Player findTarget(Player player) {
-        World world = player.getWorld();
-        Location eye = player.getEyeLocation();
-        Vector dir = eye.getDirection();
-
-        RayTraceResult blocks = world.rayTraceBlocks(eye, dir, GEYSER_RANGE, FluidCollisionMode.NEVER, true);
-        double maxDistance = blocks == null ? GEYSER_RANGE : blocks.getHitPosition().distance(eye.toVector());
-
-        RayTraceResult hit = world.rayTraceEntities(eye, dir, maxDistance, GEYSER_RAY_SIZE,
-                e -> Targets.isValidPlayer(player, e));
-        return hit != null && hit.getHitEntity() instanceof Player target ? target : null;
-    }
-
-    private void useGeyser(Player player) {
-        if (cooldowns.isOnCooldown(player, GEYSER_ID)) return; // boss bar already shows the time left
-
-        Player target = findTarget(player);
-        if (target == null) {
-            player.sendActionBar(Component.text("Look at a player to use Geyser", NamedTextColor.RED));
-            return;
-        }
-
-        cooldowns.start(player, GEYSER_ID, "Geyser", BossBar.Color.WHITE, GEYSER_COOLDOWN_MS);
-
-        Location base = target.getLocation();
-        target.setVelocity(new Vector(0, GEYSER_LAUNCH_VELOCITY, 0));
-        base.getWorld().playSound(base, Sound.ENTITY_GENERIC_SPLASH, 1.5f, 0.6f);
-
-        new BukkitRunnable() {
-            private int tick = 0;
-
-            @Override
-            public void run() {
-                if (tick >= GEYSER_COLUMN_TICKS) {
-                    cancel();
-                    return;
-                }
-                Location at = base.clone().add(0, tick * 0.7, 0);
-                at.getWorld().spawnParticle(Particle.SPLASH, at, 25, 0.35, 0.2, 0.35, 0.1);
-                at.getWorld().spawnParticle(Particle.BUBBLE_POP, at, 8, 0.3, 0.2, 0.3, 0.02);
-                at.getWorld().spawnParticle(Particle.CLOUD, at, 2, 0.2, 0.1, 0.2, 0.01);
-                tick++;
-            }
-        }.runTaskTimer(plugin, 0L, 1L);
     }
 }

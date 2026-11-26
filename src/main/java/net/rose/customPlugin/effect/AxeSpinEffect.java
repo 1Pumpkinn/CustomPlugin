@@ -42,7 +42,7 @@ public final class AxeSpinEffect {
     // ~1.4 orbits per second. Negative = counter-clockwise from above, which makes the blade edge lead.
     // Flip the sign if the blade ever looks like it's trailing again.
     private static final double SPIN_PER_TICK = -Math.toRadians(26);
-    private static final double HIT_DAMAGE = 1.5;
+    private static final double HIT_DAMAGE = 1.0;                                // half a heart
     private static final int BURN_TICKS = 80;                         // 4s
     private static final int HIT_INTERVAL_TICKS = 15;                 // per victim
     private static final int SHIELD_DISABLE_TICKS = 100;              // 5s, same as a vanilla axe

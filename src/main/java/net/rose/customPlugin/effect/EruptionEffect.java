@@ -39,9 +39,9 @@ public final class EruptionEffect {
     // --- Gameplay ---
     private static final int WARNING_TICKS = 6;
     private static final double RADIUS = 6.0;
-    // Centre of the blast hits for 3 hearts, everyone else caught in it takes 2 hearts.
-    private static final double DAMAGE = 6.0;
-    private static final double SPLASH_DAMAGE = 4.0;
+    // Damage falls off linearly with distance from the centre: 2 hearts in the middle, 1 heart at the edge.
+    private static final double CENTER_DAMAGE = 4.0;
+    private static final double EDGE_DAMAGE = 2.0;
     private static final double CORE_RADIUS = 1.5;
     private static final double LAUNCH_VELOCITY = 1.0;
     private static final int BURN_TICKS = 80;
@@ -186,19 +186,6 @@ public final class EruptionEffect {
     // ---------------------------------------------------------------- Eruption
 
     private void erupt(Player caster, Location center) {
-        World world = center.getWorld();
-        Location mid = center.clone().add(0, 1.0, 0);
-
-        world.playSound(center, Sound.ENTITY_GENERIC_EXPLODE, 0.9f, 0.6f);
-        world.playSound(center, Sound.ITEM_FIRECHARGE_USE, 1.4f, 0.5f);
-        world.playSound(center, Sound.ENTITY_BLAZE_SHOOT, 1.0f, 0.6f);
-
-        world.spawnParticle(Particle.EXPLOSION, center.clone().add(0, 0.4, 0), 1, 0, 0, 0, 0.0, null, true);
-        world.spawnParticle(Particle.LAVA, mid, 25, 0.7, 0.8, 0.7, 0.0, null, true);
-        world.spawnParticle(Particle.LARGE_SMOKE, mid, 14, 0.6, 1.0, 0.6, 0.03, null, true);
-        world.spawnParticle(Particle.BLOCK, mid, 45, 0.9, 1.0, 0.9, 0.0, MAGMA, true);
-        world.spawnParticle(Particle.BLOCK, mid, 25, 0.9, 1.0, 0.9, 0.0, BASALT, true);
-
         List<Location> tips = spawnSpikeRing(center);
         spawnFountain(center, tips);
 
@@ -212,9 +199,11 @@ public final class EruptionEffect {
 
             double dx = e.getLocation().getX() - center.getX();
             double dz = e.getLocation().getZ() - center.getZ();
-            boolean inCore = dx * dx + dz * dz <= CORE_RADIUS * CORE_RADIUS;
+            double falloff = Math.min(1.0, Math.sqrt(dx * dx + dz * dz) / RADIUS);
+            double damage = CENTER_DAMAGE + (EDGE_DAMAGE - CENTER_DAMAGE) * falloff;
 
-            e.damage(inCore ? DAMAGE : SPLASH_DAMAGE,
+            e.setNoDamageTicks(0); // armor-ignoring magic damage should always land at full strength
+            e.damage(damage,
                     DamageSource.builder(DamageType.MAGIC)
                             .withCausingEntity(caster)
                             .withDirectEntity(caster)

@@ -5,6 +5,9 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
+import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -14,9 +17,11 @@ import java.util.List;
 
 public final class VolcanicAxe {
 
+    private final JavaPlugin plugin;
     private final NamespacedKey key;
 
     public VolcanicAxe(JavaPlugin plugin) {
+        this.plugin = plugin;
         this.key = new NamespacedKey(plugin, "volcanic_axe");
     }
 
@@ -29,6 +34,14 @@ public final class VolcanicAxe {
                 ability("Offhand", "Look at a player to erupt the ground under them"),
                 ability("Crouch + Offhand", "Spin the axe around you, burning anyone it hits")
         ));
+        // Barely slower than a vanilla netherite axe (1.0 -> 0.95 attacks/s). Setting any attribute modifier
+        // replaces the item's defaults, so the netherite axe's damage (10) is restated too.
+        meta.addAttributeModifier(Attribute.ATTACK_DAMAGE, new AttributeModifier(
+                new NamespacedKey(plugin, "volcanic_axe_damage"), 9.0,
+                AttributeModifier.Operation.ADD_NUMBER, EquipmentSlotGroup.MAINHAND));
+        meta.addAttributeModifier(Attribute.ATTACK_SPEED, new AttributeModifier(
+                new NamespacedKey(plugin, "volcanic_axe_speed"), -3.05,
+                AttributeModifier.Operation.ADD_NUMBER, EquipmentSlotGroup.MAINHAND));
         meta.setItemModel(key); // texture pack model: customplugin:<name>
         meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
         item.setItemMeta(meta);
