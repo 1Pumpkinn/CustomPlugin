@@ -60,7 +60,7 @@ public final class CustomPlugin extends JavaPlugin {
                 new FrostSpearListener(this, frostSpear, cooldownBars, frostEffects), this);
         getServer().getPluginManager().registerEvents(
                 new MetalicMaceListener(this, metalicMace, cooldownBars, chainEffects), this);
-        getServer().getPluginManager().registerEvents(new TricksterBowListener(this, tricksterBow), this);
+        getServer().getPluginManager().registerEvents(new TricksterBowListener(this, tricksterBow, cooldownBars), this);
         new LungeCooldown(this).register();
         getServer().getPluginManager().registerEvents(
                 new VolcanicAxeListener(volcanicAxe, cooldownBars, eruptionEffect, axeSpinEffect), this);

@@ -1,8 +1,10 @@
 package net.rose.customPlugin.listener;
 
+import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.rose.customPlugin.item.TricksterBow;
+import net.rose.customPlugin.util.CooldownBars;
 import net.rose.customPlugin.util.Targets;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
@@ -16,17 +18,25 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityShootBowEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 public final class TricksterBowListener implements Listener {
@@ -41,26 +51,53 @@ public final class TricksterBowListener implements Listener {
     private static final double BOUNCE_START_OFFSET = 0.9;   // spawn clear of the player that was just hit
     private static final double ARROW_DROP_COMPENSATION = 0.012;
 
+    private static final int HOMING_TICKS = 30;             // bounced arrows steer onto their target so moving players still get hit
+
     private static final double SWAP_CHANCE = 0.10;
+
+    private static final long SHOT_COOLDOWN_MS = 15_000;
+    private static final String SHOT_ID = "trickster_shot";
 
     private final JavaPlugin plugin;
     private final TricksterBow bow;
+    private final CooldownBars cooldowns;
+    private final Set<UUID> armed = new HashSet<>();
     private final NamespacedKey bouncesKey;
     private final NamespacedKey lastVictimKey;
 
-    public TricksterBowListener(JavaPlugin plugin, TricksterBow bow) {
+    public TricksterBowListener(JavaPlugin plugin, TricksterBow bow, CooldownBars cooldowns) {
         this.plugin = plugin;
         this.bow = bow;
+        this.cooldowns = cooldowns;
         this.bouncesKey = new NamespacedKey(plugin, "trickster_bounces");
         this.lastVictimKey = new NamespacedKey(plugin, "trickster_last_victim");
     }
 
-    /** The shot arrow becomes the middle of a 3 arrow fan, and every arrow is stronger and can bounce. */
+    /** Offhand key (F) while holding the Trickster Bow primes the next shot. The swap itself is always cancelled. */
+    @EventHandler(ignoreCancelled = true)
+    public void onSwapHand(PlayerSwapHandItemsEvent event) {
+        Player player = event.getPlayer();
+        if (!bow.isTricksterBow(player.getInventory().getItemInMainHand())) return;
+
+        event.setCancelled(true);
+        prime(player);
+    }
+
+    /**
+     * Primed shot: the arrow becomes the middle of a 3 arrow fan, and every arrow is stronger and can bounce.
+     * Unprimed shots are plain arrows (the passive still applies to them).
+     */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onShoot(EntityShootBowEvent event) {
         if (!(event.getEntity() instanceof Player shooter)) return;
         if (!bow.isTricksterBow(event.getBow())) return;
         if (!(event.getProjectile() instanceof Arrow main)) return;
+
+        if (!armed.remove(shooter.getUniqueId())) {
+            tag(main, 0, null); // not primed: no fan, no bounce, but the hotbar passive still rolls
+            return;
+        }
+        cooldowns.start(shooter, SHOT_ID, "Trickster Shot", BossBar.Color.PURPLE, SHOT_COOLDOWN_MS);
 
         main.setDamage(main.getDamage() * DAMAGE_MULTIPLIER);
         tag(main, MAX_BOUNCES, null);
@@ -110,6 +147,33 @@ public final class TricksterBowListener implements Listener {
         }
     }
 
+    @EventHandler
+    public void onDeath(PlayerDeathEvent event) {
+        armed.remove(event.getEntity().getUniqueId());
+    }
+
+    @EventHandler
+    public void onJoin(PlayerJoinEvent event) {
+        cooldowns.resume(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        Player player = event.getPlayer();
+        armed.remove(player.getUniqueId());
+        cooldowns.hideAll(player);
+    }
+
+    private void prime(Player player) {
+        if (cooldowns.isOnCooldown(player, SHOT_ID)) return; // boss bar already shows the time left
+        if (!armed.add(player.getUniqueId())) {
+            player.sendActionBar(Component.text("Trickster Shot is already ready", NamedTextColor.LIGHT_PURPLE));
+            return;
+        }
+        player.sendActionBar(Component.text("Trickster Shot ready - fire your bow", NamedTextColor.LIGHT_PURPLE));
+        player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1.6f);
+    }
+
     private void bounce(Player shooter, Player from, int bouncesLeft, double damage, boolean critical) {
         if (!shooter.isOnline() || !from.isOnline()) return;
 
@@ -136,10 +200,33 @@ public final class TricksterBowListener implements Listener {
             arrow.setCritical(critical);
             arrow.setPickupStatus(AbstractArrow.PickupStatus.DISALLOWED);
             tag(arrow, bouncesLeft, from);
+            home(arrow, next);
         });
 
         world.playSound(start, Sound.ENTITY_ARROW_SHOOT, 1f, 1.5f);
         world.spawnParticle(Particle.CRIT, start, 12, 0.3, 0.3, 0.3, 0.2);
+    }
+
+    /** Steers a bounced arrow onto its target for a short while so it still connects if the target moves. */
+    private void home(Arrow arrow, Player target) {
+        new BukkitRunnable() {
+            private int ticks = 0;
+
+            @Override
+            public void run() {
+                if (!arrow.isValid() || arrow.isInBlock() || arrow.isOnGround()
+                        || !target.isOnline() || target.isDead() || ticks++ >= HOMING_TICKS) {
+                    cancel();
+                    return;
+                }
+                Vector toTarget = target.getLocation().add(0, 1.0, 0).toVector()
+                        .subtract(arrow.getLocation().toVector());
+                if (toTarget.lengthSquared() < 0.01) return;
+                toTarget.normalize();
+                toTarget.setY(toTarget.getY() + 0.02); // tiny lift to counter drop
+                arrow.setVelocity(toTarget.normalize().multiply(BOUNCE_SPEED));
+            }
+        }.runTaskTimer(plugin, 1L, 1L);
     }
 
     /** Closest other player (not the shooter, not the one just hit) within range and in line of sight. */
