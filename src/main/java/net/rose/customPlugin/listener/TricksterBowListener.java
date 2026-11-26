@@ -1,8 +1,6 @@
 package net.rose.customPlugin.listener;
 
 import net.kyori.adventure.bossbar.BossBar;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.rose.customPlugin.item.TricksterBow;
 import net.rose.customPlugin.util.CooldownBars;
 import net.rose.customPlugin.util.Targets;
@@ -95,6 +93,7 @@ public final class TricksterBowListener implements Listener {
             tag(main, 0, null); // not primed: no fan, no bounce, but the hotbar passive still rolls
             return;
         }
+        cooldowns.unprime(shooter, SHOT_ID);
         cooldowns.start(shooter, SHOT_ID, "Trickster Shot", BossBar.Color.PURPLE, SHOT_COOLDOWN_MS);
 
         main.setDamage(main.getDamage() * DAMAGE_MULTIPLIER);
@@ -151,6 +150,7 @@ public final class TricksterBowListener implements Listener {
     @EventHandler
     public void onDeath(PlayerDeathEvent event) {
         armed.remove(event.getEntity().getUniqueId());
+        cooldowns.unprime(event.getEntity(), SHOT_ID);
     }
 
     @EventHandler
@@ -167,11 +167,8 @@ public final class TricksterBowListener implements Listener {
 
     private void prime(Player player) {
         if (cooldowns.isOnCooldown(player, SHOT_ID)) return; // boss bar already shows the time left
-        if (!armed.add(player.getUniqueId())) {
-            player.sendActionBar(Component.text("Trickster Shot is already ready", NamedTextColor.LIGHT_PURPLE));
-            return;
-        }
-        player.sendActionBar(Component.text("Trickster Shot ready - fire your bow", NamedTextColor.LIGHT_PURPLE));
+        if (!armed.add(player.getUniqueId())) return;
+        cooldowns.prime(player, SHOT_ID, "Trickster Shot", BossBar.Color.PURPLE);
         player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1.6f);
     }
 

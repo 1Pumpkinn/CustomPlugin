@@ -1,0 +1,6 @@
+{
+  "model": {
+    "type": "minecraft:model",
+    "model": "customplugin:item/petal_blade"
+  }
+}

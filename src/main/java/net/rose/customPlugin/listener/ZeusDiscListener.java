@@ -1,12 +1,11 @@
 package net.rose.customPlugin.listener;
 
 import net.kyori.adventure.bossbar.BossBar;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.rose.customPlugin.effect.ZeusDiscFlight;
 import net.rose.customPlugin.effect.ZeusLightning;
 import net.rose.customPlugin.item.ZeusDisc;
 import net.rose.customPlugin.util.CooldownBars;
+import net.rose.customPlugin.util.DeathMessages;
 import org.bukkit.GameMode;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
@@ -43,15 +42,18 @@ public final class ZeusDiscListener implements Listener {
     private final ZeusDisc disc;
     private final CooldownBars cooldowns;
     private final ZeusLightning lightning;
+    private final DeathMessages deaths;
 
     private final Set<UUID> armed = new HashSet<>();
     private final Map<UUID, ZeusDiscFlight> flights = new HashMap<>();
 
-    public ZeusDiscListener(JavaPlugin plugin, ZeusDisc disc, CooldownBars cooldowns, ZeusLightning lightning) {
+    public ZeusDiscListener(JavaPlugin plugin, ZeusDisc disc, CooldownBars cooldowns, ZeusLightning lightning,
+                            DeathMessages deaths) {
         this.plugin = plugin;
         this.disc = disc;
         this.cooldowns = cooldowns;
         this.lightning = lightning;
+        this.deaths = deaths;
     }
 
     /** Offhand key (F) while holding the Zeus Disc primes the next throw. The swap itself is always cancelled. */
@@ -92,6 +94,7 @@ public final class ZeusDiscListener implements Listener {
     @EventHandler
     public void onDeath(PlayerDeathEvent event) {
         armed.remove(event.getEntity().getUniqueId());
+        cooldowns.unprime(event.getEntity(), STRIKE_ID);
     }
 
     @EventHandler
@@ -118,11 +121,8 @@ public final class ZeusDiscListener implements Listener {
 
     private void prime(Player player) {
         if (cooldowns.isOnCooldown(player, STRIKE_ID)) return; // boss bar already shows the time left
-        if (!armed.add(player.getUniqueId())) {
-            player.sendActionBar(Component.text("Zeus Strike is already ready", NamedTextColor.YELLOW));
-            return;
-        }
-        player.sendActionBar(Component.text("Zeus Strike ready - throw the disc", NamedTextColor.YELLOW));
+        if (!armed.add(player.getUniqueId())) return;
+        cooldowns.prime(player, STRIKE_ID, "Zeus Strike", BossBar.Color.YELLOW);
         player.playSound(player.getLocation(), Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 0.5f, 1.8f);
     }
 
@@ -140,15 +140,19 @@ public final class ZeusDiscListener implements Listener {
         thrown.setAmount(1);
 
         boolean primed = armed.remove(id);
+        if (primed) cooldowns.unprime(player, STRIKE_ID);
         inventory.setItem(slot, null);
         try {
-            flights.put(id, ZeusDiscFlight.launch(plugin, lightning, flight -> flights.remove(id, flight),
+            flights.put(id, ZeusDiscFlight.launch(plugin, lightning, deaths, flight -> flights.remove(id, flight),
                     player, thrown, slot, primed));
         } catch (Throwable t) {
             // The throw failed after the disc left the inventory: put it straight back.
             plugin.getLogger().log(Level.SEVERE, "Could not throw the Zeus Disc", t);
             inventory.setItem(slot, thrown);
-            if (primed) armed.add(id);
+            if (primed) {
+                armed.add(id);
+                cooldowns.prime(player, STRIKE_ID, "Zeus Strike", BossBar.Color.YELLOW);
+            }
             return;
         }
         if (primed) {

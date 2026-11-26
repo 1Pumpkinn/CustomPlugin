@@ -1,5 +1,6 @@
 package net.rose.customPlugin.effect;
 
+import net.rose.customPlugin.util.DeathMessages;
 import net.rose.customPlugin.util.DiscPathfinder;
 import net.rose.customPlugin.util.Targets;
 import org.bukkit.Bukkit;
@@ -106,6 +107,7 @@ public final class ZeusDiscFlight {
 
     private final JavaPlugin plugin;
     private final ZeusLightning lightning;
+    private final DeathMessages deaths;
     private final Consumer<ZeusDiscFlight> onEnd;
     private final UUID ownerId;
     private final World world;
@@ -145,6 +147,7 @@ public final class ZeusDiscFlight {
     private ZeusDiscFlight(
             JavaPlugin plugin,
             ZeusLightning lightning,
+            DeathMessages deaths,
             Consumer<ZeusDiscFlight> onEnd,
             Player owner,
             ItemStack stack,
@@ -152,6 +155,7 @@ public final class ZeusDiscFlight {
             boolean primed) {
         this.plugin = plugin;
         this.lightning = lightning;
+        this.deaths = deaths;
         this.onEnd = onEnd;
         this.ownerId = owner.getUniqueId();
         this.stack = stack;
@@ -163,12 +167,13 @@ public final class ZeusDiscFlight {
     public static ZeusDiscFlight launch(
             JavaPlugin plugin,
             ZeusLightning lightning,
+            DeathMessages deaths,
             Consumer<ZeusDiscFlight> onEnd,
             Player owner,
             ItemStack stack,
             int homeSlot,
             boolean primed) {
-        ZeusDiscFlight disc = new ZeusDiscFlight(plugin, lightning, onEnd, owner, stack, homeSlot, primed);
+        ZeusDiscFlight disc = new ZeusDiscFlight(plugin, lightning, deaths, onEnd, owner, stack, homeSlot, primed);
         disc.start(owner);
         return disc;
     }
@@ -510,6 +515,7 @@ public final class ZeusDiscFlight {
         hitSomeone = true;
         lastHitTick.put(target.getUniqueId(), age);
         double before = target.getHealth();
+        deaths.mark(target, owner, DeathMessages.ZEUS_DISC);
         target.damage(DISC_DAMAGE, owner);
         boolean landed = target.isDead() || target.getHealth() < before;
         if (landed) applyKnockback(target);

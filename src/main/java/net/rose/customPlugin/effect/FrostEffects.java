@@ -1,7 +1,6 @@
 package net.rose.customPlugin.effect;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
+import net.rose.customPlugin.util.DeathMessages;
 import net.rose.customPlugin.util.Targets;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -39,6 +38,7 @@ public final class FrostEffects {
     private static final BlockData ICE = Material.ICE.createBlockData();
 
     private final JavaPlugin plugin;
+    private final DeathMessages deaths;
     private final Map<UUID, BukkitTask> freezing = new HashMap<>();
     private final Map<UUID, Long> stunnedUntil = new HashMap<>();
     private final Set<UUID> harmlessFreeze = new HashSet<>();
@@ -46,8 +46,9 @@ public final class FrostEffects {
     /** True while our own freeze damage is being dealt, so listeners can tell it apart from a real stab. */
     private boolean applyingDamage = false;
 
-    public FrostEffects(JavaPlugin plugin) {
+    public FrostEffects(JavaPlugin plugin, DeathMessages deaths) {
         this.plugin = plugin;
+        this.deaths = deaths;
     }
 
     /** Whether the damage event currently being handled is the freeze's own damage pulse. */
@@ -64,9 +65,7 @@ public final class FrostEffects {
 
     public void stun(LivingEntity victim, int ticks) {
         stunnedUntil.put(victim.getUniqueId(), System.currentTimeMillis() + ticks * 50L);
-        if (victim instanceof Player player) {
-            player.sendActionBar(Component.text("Stunned!", NamedTextColor.AQUA));
-        } else if (victim instanceof Mob mob) {
+        if (victim instanceof Mob mob) {
             // No AI: it can't walk, target or attack. Gravity and knockback still work.
             mob.setAware(false);
             plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
@@ -129,6 +128,7 @@ public final class FrostEffects {
                 if (damaging && ticks >= FREEZE_FIRST_PULSE && (ticks - FREEZE_FIRST_PULSE) % FREEZE_PULSE_INTERVAL == 0) {
                     applyingDamage = true;
                     try {
+                        deaths.mark(victim, attacker, DeathMessages.FROST_SPEAR);
                         victim.damage(FREEZE_DAMAGE,
                                 DamageSource.builder(DamageType.FREEZE)
                                         .withCausingEntity(attacker)

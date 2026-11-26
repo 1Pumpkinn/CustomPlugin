@@ -1,5 +1,6 @@
 package net.rose.customPlugin.effect;
 
+import net.rose.customPlugin.util.DeathMessages;
 import net.rose.customPlugin.util.Targets;
 import org.bukkit.Location;
 import org.bukkit.Particle;
@@ -30,9 +31,11 @@ public final class ZeusLightning {
     private static final long CHAIN_WAVE_DELAY_TICKS = 3L;
 
     private final JavaPlugin plugin;
+    private final DeathMessages deaths;
 
-    public ZeusLightning(JavaPlugin plugin) {
+    public ZeusLightning(JavaPlugin plugin, DeathMessages deaths) {
         this.plugin = plugin;
+        this.deaths = deaths;
     }
 
     /** A real lightning bolt on the target, visual only (no fire, no vanilla damage); the damage is dealt here so it is credited to the thrower. */
@@ -105,6 +108,7 @@ public final class ZeusLightning {
 
     private void zap(Player owner, LivingEntity target, double damage, DamageType type) {
         target.setNoDamageTicks(0); // the bolt lands even right after the disc hit
+        deaths.mark(target, owner, DeathMessages.ZEUS_DISC);
         target.damage(damage, DamageSource.builder(type)
                 .withCausingEntity(owner)
                 .withDirectEntity(owner)

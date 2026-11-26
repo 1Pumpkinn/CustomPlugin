@@ -6,9 +6,12 @@ import net.rose.customPlugin.effect.AxeSpinEffect;
 import net.rose.customPlugin.effect.ChainEffects;
 import net.rose.customPlugin.effect.EruptionEffect;
 import net.rose.customPlugin.effect.FrostEffects;
+import net.rose.customPlugin.effect.PetalEffect;
 import net.rose.customPlugin.effect.ZeusLightning;
 import net.rose.customPlugin.item.FrostSpear;
+import net.rose.customPlugin.item.Legendaries;
 import net.rose.customPlugin.item.MetalicMace;
+import net.rose.customPlugin.item.PetalBlade;
 import net.rose.customPlugin.item.TricksterBow;
 import net.rose.customPlugin.item.TideBlade;
 import net.rose.customPlugin.item.VolcanicAxe;
@@ -17,9 +20,11 @@ import net.rose.customPlugin.listener.DroppedItemGlow;
 import net.rose.customPlugin.listener.EgapListener;
 import net.rose.customPlugin.listener.FrostSpearListener;
 import net.rose.customPlugin.listener.KillTokenListener;
+import net.rose.customPlugin.listener.LegendaryDeathListener;
 import net.rose.customPlugin.listener.LungeCooldown;
 import net.rose.customPlugin.listener.MaceDamageCap;
 import net.rose.customPlugin.listener.MetalicMaceListener;
+import net.rose.customPlugin.listener.PetalBladeListener;
 import net.rose.customPlugin.listener.StunListener;
 import net.rose.customPlugin.listener.TideBladeListener;
 import net.rose.customPlugin.listener.TricksterBowListener;
@@ -28,6 +33,7 @@ import net.rose.customPlugin.listener.ZeusDiscListener;
 import net.rose.customPlugin.pack.ResourcePackManager;
 import net.rose.customPlugin.command.WeaponPackCommand;
 import net.rose.customPlugin.util.CooldownBars;
+import net.rose.customPlugin.util.DeathMessages;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -47,6 +53,9 @@ public final class CustomPlugin extends JavaPlugin {
     private CooldownBars cooldownBars;
     private EruptionEffect eruptionEffect;
     private AxeSpinEffect axeSpinEffect;
+    private PetalBlade petalBlade;
+    private PetalEffect petalEffect;
+    private DeathMessages deathMessages;
 
     @Override
     public void onEnable() {
@@ -54,17 +63,22 @@ public final class CustomPlugin extends JavaPlugin {
         this.tideBlade = new TideBlade(this);
         this.volcanicAxe = new VolcanicAxe(this);
         this.frostSpear = new FrostSpear(this);
-        this.frostEffects = new FrostEffects(this);
+        this.deathMessages = new DeathMessages();
+        this.frostEffects = new FrostEffects(this, deathMessages);
         this.metalicMace = new MetalicMace(this);
         this.tricksterBow = new TricksterBow(this);
         this.zeusDisc = new ZeusDisc(this);
         this.chainEffects = new ChainEffects(this);
         this.cooldownBars = new CooldownBars(this);
-        this.eruptionEffect = new EruptionEffect(this);
-        this.axeSpinEffect = new AxeSpinEffect(this);
+        this.eruptionEffect = new EruptionEffect(this, deathMessages);
+        this.axeSpinEffect = new AxeSpinEffect(this, deathMessages);
+        this.petalBlade = new PetalBlade(this);
+        this.petalEffect = new PetalEffect(this, deathMessages);
 
         getServer().getPluginManager().registerEvents(new KillTokenListener(killToken), this);
-        getServer().getPluginManager().registerEvents(new TideBladeListener(this, tideBlade, cooldownBars), this);
+        getServer().getPluginManager().registerEvents(deathMessages, this);
+        getServer().getPluginManager().registerEvents(new LegendaryDeathListener(this, new Legendaries(this)), this);
+        getServer().getPluginManager().registerEvents(new TideBladeListener(this, tideBlade, cooldownBars, deathMessages), this);
         getServer().getPluginManager().registerEvents(new EgapListener(), this);
         getServer().getPluginManager().registerEvents(new StunListener(frostEffects), this);
         getServer().getPluginManager().registerEvents(
@@ -72,13 +86,16 @@ public final class CustomPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(
                 new MetalicMaceListener(this, metalicMace, cooldownBars, chainEffects), this);
         getServer().getPluginManager().registerEvents(new TricksterBowListener(this, tricksterBow, cooldownBars), this);
-        this.zeusDiscListener = new ZeusDiscListener(this, zeusDisc, cooldownBars, new ZeusLightning(this));
+        this.zeusDiscListener = new ZeusDiscListener(this, zeusDisc, cooldownBars,
+                new ZeusLightning(this, deathMessages), deathMessages);
         getServer().getPluginManager().registerEvents(zeusDiscListener, this);
         new LungeCooldown(this).register();
         getServer().getPluginManager().registerEvents(new MaceDamageCap(), this);
         getServer().getPluginManager().registerEvents(new DroppedItemGlow(this), this);
         getServer().getPluginManager().registerEvents(
                 new VolcanicAxeListener(volcanicAxe, cooldownBars, eruptionEffect, axeSpinEffect), this);
+
+        getServer().getPluginManager().registerEvents(new PetalBladeListener(petalBlade, cooldownBars, petalEffect), this);
 
         saveDefaultConfig();
         // The pack is bundled in this jar and served by a built-in HTTP server (see resource-pack in config.yml).
@@ -91,7 +108,7 @@ public final class CustomPlugin extends JavaPlugin {
             packCommand.setTabCompleter(weaponPackCommand);
         }
 
-        WeaponCommand weaponCommand = new WeaponCommand(tideBlade, volcanicAxe, frostSpear, metalicMace, tricksterBow, zeusDisc);
+        WeaponCommand weaponCommand = new WeaponCommand(tideBlade, volcanicAxe, frostSpear, metalicMace, tricksterBow, zeusDisc, petalBlade);
         PluginCommand command = getCommand("weapon");
         if (command != null) {
             command.setExecutor(weaponCommand);
@@ -106,6 +123,7 @@ public final class CustomPlugin extends JavaPlugin {
         if (cooldownBars != null) cooldownBars.shutdown();
         if (eruptionEffect != null) eruptionEffect.removeAll();
         if (axeSpinEffect != null) axeSpinEffect.removeAll();
+        if (petalEffect != null) petalEffect.removeAll();
         if (frostEffects != null) frostEffects.shutdown();
         if (chainEffects != null) chainEffects.shutdown();
     }
@@ -128,5 +146,9 @@ public final class CustomPlugin extends JavaPlugin {
 
     public TideBlade getTideBlade() {
         return tideBlade;
+    }
+
+    public PetalBlade getPetalBlade() {
+        return petalBlade;
     }
 }

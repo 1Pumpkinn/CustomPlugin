@@ -1,5 +1,6 @@
 package net.rose.customPlugin.effect;
 
+import net.rose.customPlugin.util.DeathMessages;
 import net.rose.customPlugin.util.Targets;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -57,10 +58,12 @@ public final class AxeSpinEffect {
     }
 
     private final JavaPlugin plugin;
+    private final DeathMessages deaths;
     private final Map<UUID, Active> active = new HashMap<>();
 
-    public AxeSpinEffect(JavaPlugin plugin) {
+    public AxeSpinEffect(JavaPlugin plugin, DeathMessages deaths) {
         this.plugin = plugin;
+        this.deaths = deaths;
     }
 
     public void start(Player caster) {
@@ -203,6 +206,7 @@ public final class AxeSpinEffect {
 
             if (entity instanceof Player victim && victim.isBlocking()) breakShield(victim);
 
+            deaths.mark(entity, caster, DeathMessages.VOLCANIC_AXE);
             entity.damage(HIT_DAMAGE,
                     DamageSource.builder(DamageType.MAGIC)
                             .withCausingEntity(caster)

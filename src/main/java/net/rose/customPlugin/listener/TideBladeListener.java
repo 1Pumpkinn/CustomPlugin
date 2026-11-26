@@ -1,10 +1,9 @@
 package net.rose.customPlugin.listener;
 
 import net.kyori.adventure.bossbar.BossBar;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.rose.customPlugin.item.TideBlade;
 import net.rose.customPlugin.util.CooldownBars;
+import net.rose.customPlugin.util.DeathMessages;
 import net.rose.customPlugin.util.Targets;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
@@ -44,14 +43,16 @@ public final class TideBladeListener implements Listener {
     private final JavaPlugin plugin;
     private final TideBlade tideBlade;
     private final CooldownBars cooldowns;
+    private final DeathMessages deaths;
 
     private final Set<UUID> armed = new HashSet<>();
     private final Map<UUID, BukkitTask> drowning = new HashMap<>();
 
-    public TideBladeListener(JavaPlugin plugin, TideBlade tideBlade, CooldownBars cooldowns) {
+    public TideBladeListener(JavaPlugin plugin, TideBlade tideBlade, CooldownBars cooldowns, DeathMessages deaths) {
         this.plugin = plugin;
         this.tideBlade = tideBlade;
         this.cooldowns = cooldowns;
+        this.deaths = deaths;
     }
 
     /**
@@ -78,6 +79,7 @@ public final class TideBladeListener implements Listener {
         if (!tideBlade.isTideBlade(attacker.getInventory().getItemInMainHand())) return;
 
         armed.remove(attacker.getUniqueId());
+        cooldowns.unprime(attacker, DROWN_ID);
         cooldowns.start(attacker, DROWN_ID, "Drown", BossBar.Color.BLUE, DROWN_COOLDOWN_MS);
         startDrowning(attacker, victim);
     }
@@ -85,6 +87,7 @@ public final class TideBladeListener implements Listener {
     @EventHandler
     public void onDeath(PlayerDeathEvent event) {
         armed.remove(event.getEntity().getUniqueId());
+        cooldowns.unprime(event.getEntity(), DROWN_ID);
     }
 
     @EventHandler
@@ -104,11 +107,8 @@ public final class TideBladeListener implements Listener {
 
     private void armDrown(Player player) {
         if (cooldowns.isOnCooldown(player, DROWN_ID)) return; // boss bar already shows the time left
-        if (!armed.add(player.getUniqueId())) {
-            player.sendActionBar(Component.text("Drown is already ready", NamedTextColor.AQUA));
-            return;
-        }
-        player.sendActionBar(Component.text("Drown ready - hit a target", NamedTextColor.AQUA));
+        if (!armed.add(player.getUniqueId())) return;
+        cooldowns.prime(player, DROWN_ID, "Drown", BossBar.Color.BLUE);
         player.playSound(player.getLocation(), Sound.ENTITY_GENERIC_SPLASH, 1f, 0.8f);
     }
 
@@ -132,6 +132,7 @@ public final class TideBladeListener implements Listener {
                 if (ticks >= AIR_DRAIN_TICKS && (ticks - AIR_DRAIN_TICKS) % DROWN_DAMAGE_INTERVAL == 0) {
                     // Drowning damage credited to the attacker, so kills count as theirs.
                     // The DROWN damage type already plays the drowning hurt sound itself.
+                    deaths.mark(victim, attacker, DeathMessages.TIDE_BLADE);
                     victim.damage(DROWN_DAMAGE,
                             DamageSource.builder(DamageType.DROWN)
                                     .withCausingEntity(attacker)

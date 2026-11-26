@@ -25,6 +25,7 @@ public final class CooldownBars {
 
     private final JavaPlugin plugin;
     private final Map<UUID, Map<String, Cooldown>> cooldowns = new HashMap<>();
+    private final Map<UUID, Map<String, BossBar>> primed = new HashMap<>();
 
     public CooldownBars(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -57,8 +58,42 @@ public final class CooldownBars {
         return cooldown == null ? 0 : Math.max(0, cooldown.endsAt - System.currentTimeMillis());
     }
 
-    /** Hides all of the player's bars (e.g. on quit) but keeps the cooldowns running. */
+    /** Shows a full "ready" boss bar for an ability that is primed and waiting to be used. */
+    public void prime(Player player, String id, String label, BossBar.Color color) {
+        unprime(player, id);
+        BossBar bar = BossBar.bossBar(Component.text(label + " - ready", NamedTextColor.WHITE), 1f,
+                color, BossBar.Overlay.PROGRESS);
+        primed.computeIfAbsent(player.getUniqueId(), k -> new HashMap<>()).put(id, bar);
+        player.showBossBar(bar);
+    }
+
+    /** Changes the text and fill of a primed bar, e.g. to count down uses left. Does nothing if it isn't showing. */
+    public void updatePrimed(Player player, String id, Component title, float progress) {
+        Map<String, BossBar> perPlayer = primed.get(player.getUniqueId());
+        if (perPlayer == null) return;
+        BossBar bar = perPlayer.get(id);
+        if (bar == null) return;
+        bar.name(title);
+        bar.progress(Math.max(0f, Math.min(1f, progress)));
+    }
+
+    /** Hides the primed bar once the ability has been used (or lost). */
+    public void unprime(Player player, String id) {
+        Map<String, BossBar> perPlayer = primed.get(player.getUniqueId());
+        if (perPlayer == null) return;
+        BossBar bar = perPlayer.remove(id);
+        if (bar != null) player.hideBossBar(bar);
+        if (perPlayer.isEmpty()) primed.remove(player.getUniqueId());
+    }
+
+    /** Hides all of the player's bars (e.g. on quit) but keeps the cooldowns running. Primed bars are dropped. */
     public void hideAll(Player player) {
+        Map<String, BossBar> primedBars = primed.remove(player.getUniqueId());
+        if (primedBars != null) {
+            for (BossBar bar : primedBars.values()) {
+                player.hideBossBar(bar);
+            }
+        }
         Map<String, Cooldown> perPlayer = cooldowns.get(player.getUniqueId());
         if (perPlayer == null) return;
         for (Cooldown cooldown : perPlayer.values()) {

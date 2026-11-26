@@ -1,5 +1,6 @@
 package net.rose.customPlugin.effect;
 
+import net.rose.customPlugin.util.DeathMessages;
 import net.rose.customPlugin.util.Targets;
 import org.bukkit.Color;
 import org.bukkit.FluidCollisionMode;
@@ -82,10 +83,12 @@ public final class EruptionEffect {
     private static final double[] RING_FRACTIONS = {0.86, 0.60, 0.34};
 
     private final JavaPlugin plugin;
+    private final DeathMessages deaths;
     private final Set<BlockDisplay> activeSlabs = new HashSet<>();
 
-    public EruptionEffect(JavaPlugin plugin) {
+    public EruptionEffect(JavaPlugin plugin, DeathMessages deaths) {
         this.plugin = plugin;
+        this.deaths = deaths;
     }
 
     /** The point on the floor below {@code from}, a hair above the surface. */
@@ -203,6 +206,7 @@ public final class EruptionEffect {
             double damage = CENTER_DAMAGE + (EDGE_DAMAGE - CENTER_DAMAGE) * falloff;
 
             e.setNoDamageTicks(0); // armor-ignoring magic damage should always land at full strength
+            deaths.mark(e, caster, DeathMessages.VOLCANIC_AXE);
             e.damage(damage,
                     DamageSource.builder(DamageType.MAGIC)
                             .withCausingEntity(caster)
