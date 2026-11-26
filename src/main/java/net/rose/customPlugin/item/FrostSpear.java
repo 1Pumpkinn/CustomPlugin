@@ -29,6 +29,7 @@ public final class FrostSpear {
                 ability("Offhand", "Dash forward, freezing and stunning every player you dash into"),
                 ability("Passive", "Stabbing a player frosts and slows them")
         ));
+        meta.setItemModel(key); // texture pack model: customplugin:<name>
         meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
         item.setItemMeta(meta);
         return item;

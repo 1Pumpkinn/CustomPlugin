@@ -33,6 +33,7 @@ public final class ZeusDisc {
                 ability("Passive", "Every hit chains lightning to nearby players and mobs for half a heart")
         ));
         meta.setEnchantmentGlintOverride(true);
+        meta.setItemModel(key); // texture pack model: customplugin:<name>
         meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
         item.setItemMeta(meta);
 

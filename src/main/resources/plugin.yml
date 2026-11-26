@@ -15,7 +15,18 @@ commands:
     aliases: [ weapons ]
     permission: customplugin.weapon
 
+  weaponpack:
+    description: Get the weapon texture pack (reload re-reads the config)
+    usage: /weaponpack [reload]
+    permission: customplugin.weaponpack
+
 permissions:
   customplugin.weapon:
     description: Allows use of /weapon
+    default: op
+  customplugin.weaponpack:
+    description: Allows /weaponpack
+    default: true
+  customplugin.weaponpack.reload:
+    description: Allows /weaponpack reload
     default: op

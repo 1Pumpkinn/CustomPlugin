@@ -29,6 +29,7 @@ public final class VolcanicAxe {
                 ability("Offhand", "Look at a player to erupt the ground under them"),
                 ability("Crouch + Offhand", "Spin the axe around you, burning anyone it hits")
         ));
+        meta.setItemModel(key); // texture pack model: customplugin:<name>
         meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
         item.setItemMeta(meta);
         return item;

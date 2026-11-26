@@ -23,6 +23,8 @@ import net.rose.customPlugin.listener.TideBladeListener;
 import net.rose.customPlugin.listener.TricksterBowListener;
 import net.rose.customPlugin.listener.VolcanicAxeListener;
 import net.rose.customPlugin.listener.ZeusDiscListener;
+import net.rose.customPlugin.pack.ResourcePackAssigner;
+import net.rose.customPlugin.command.WeaponPackCommand;
 import net.rose.customPlugin.util.CooldownBars;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -37,6 +39,7 @@ public final class CustomPlugin extends JavaPlugin {
     private MetalicMace metalicMace;
     private TricksterBow tricksterBow;
     private ZeusDisc zeusDisc;
+    private ResourcePackAssigner packAssigner;
     private ZeusDiscListener zeusDiscListener;
     private ChainEffects chainEffects;
     private CooldownBars cooldownBars;
@@ -72,6 +75,17 @@ public final class CustomPlugin extends JavaPlugin {
         new LungeCooldown(this).register();
         getServer().getPluginManager().registerEvents(
                 new VolcanicAxeListener(volcanicAxe, cooldownBars, eruptionEffect, axeSpinEffect), this);
+
+        saveDefaultConfig();
+        this.packAssigner = new ResourcePackAssigner(this);
+        packAssigner.load();
+        getServer().getPluginManager().registerEvents(packAssigner, this);
+        PluginCommand packCommand = getCommand("weaponpack");
+        if (packCommand != null) {
+            WeaponPackCommand weaponPackCommand = new WeaponPackCommand(packAssigner);
+            packCommand.setExecutor(weaponPackCommand);
+            packCommand.setTabCompleter(weaponPackCommand);
+        }
 
         WeaponCommand weaponCommand = new WeaponCommand(tideBlade, volcanicAxe, frostSpear, metalicMace, tricksterBow, zeusDisc);
         PluginCommand command = getCommand("weapon");

@@ -29,6 +29,7 @@ public final class TideBlade {
                 ability("Offhand", "Drown the next player you hit for 8s"),
                 ability("Crouch + Offhand", "Launch a player up with a geyser")
         ));
+        meta.setItemModel(key); // texture pack model: customplugin:<name>
         meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
         item.setItemMeta(meta);
         return item;
