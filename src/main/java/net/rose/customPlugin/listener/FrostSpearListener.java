@@ -33,7 +33,7 @@ import java.util.UUID;
 public final class FrostSpearListener implements Listener {
 
     // --- Dash ---
-    private static final long DASH_COOLDOWN_MS = 10_000;
+    private static final long DASH_COOLDOWN_MS = 25_000;
     private static final int DASH_TICKS = 8;
     private static final double DASH_SPEED = 1.2;           // blocks per tick, ~9 blocks total
     private static final double DASH_HIT_EXPAND = 1.0;      // how far around you counts as "dashed into"

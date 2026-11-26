@@ -42,11 +42,13 @@ public final class ZeusLightning {
     }
 
     /**
-     * Chain lightning: a bolt (visual only, no fire or block damage) on the hit target, then it spreads
+     * Chain lightning: a bolt (particles only) on the hit target, then it spreads
      * outwards to every player and mob within range of anything it has already reached.
      * Each one it reaches takes half a heart.
      */
     public void chain(Player owner, LivingEntity origin) {
+        if (!hasPlayerNearby(owner, origin)) return; // nobody to jump to: no lightning at all
+
         Set<UUID> reached = new HashSet<>();
         reached.add(origin.getUniqueId());
 
@@ -56,15 +58,27 @@ public final class ZeusLightning {
         wave(owner, frontier, reached, CHAIN_WAVES);
     }
 
+    /** True if some other valid player is within chain range of the hit target. */
+    private boolean hasPlayerNearby(Player owner, LivingEntity origin) {
+        Location centre = origin.getLocation();
+        for (Player candidate : centre.getWorld().getNearbyPlayers(centre, CHAIN_RANGE)) {
+            if (candidate.getUniqueId().equals(origin.getUniqueId())) continue;
+            if (!Targets.isValidPlayer(owner, candidate)) continue;
+            if (centre.distanceSquared(candidate.getLocation()) > CHAIN_RANGE * CHAIN_RANGE) continue;
+            return true;
+        }
+        return false;
+    }
+
     private void wave(Player owner, List<LivingEntity> frontier, Set<UUID> reached, int wavesLeft) {
         if (wavesLeft <= 0 || frontier.isEmpty() || !owner.isOnline()) return;
 
         List<LivingEntity> next = new ArrayList<>();
         for (LivingEntity from : frontier) {
             Location centre = from.getLocation();
-            for (LivingEntity candidate : centre.getWorld().getNearbyLivingEntities(centre, CHAIN_RANGE)) {
+            for (Player candidate : centre.getWorld().getNearbyPlayers(centre, CHAIN_RANGE)) {
                 if (reached.size() > CHAIN_MAX_TARGETS) break;
-                if (reached.contains(candidate.getUniqueId()) || !Targets.isValidTarget(owner, candidate)) continue;
+                if (reached.contains(candidate.getUniqueId()) || !Targets.isValidPlayer(owner, candidate)) continue;
                 if (centre.distanceSquared(candidate.getLocation()) > CHAIN_RANGE * CHAIN_RANGE) continue;
 
                 reached.add(candidate.getUniqueId());
@@ -81,9 +95,19 @@ public final class ZeusLightning {
                 () -> wave(owner, next, reached, wavesLeft - 1), CHAIN_WAVE_DELAY_TICKS);
     }
 
-    /** A real lightning bolt that only looks and sounds like one: no damage, no fire, nothing transformed. */
+    /** A lightning-looking strike made only of particles and sound: no real bolt entity, no fire, no block damage. */
     private void bolt(Location at) {
-        at.getWorld().strikeLightningEffect(at);
+        World world = at.getWorld();
+        // A jagged column of sparks from the sky down to the target.
+        for (double y = 0; y <= 12; y += 0.5) {
+            double jitterX = (Math.random() - 0.5) * 0.5;
+            double jitterZ = (Math.random() - 0.5) * 0.5;
+            world.spawnParticle(Particle.ELECTRIC_SPARK, at.getX() + jitterX, at.getY() + y, at.getZ() + jitterZ,
+                    2, 0.05, 0.05, 0.05, 0.0);
+        }
+        world.spawnParticle(Particle.END_ROD, at.clone().add(0, 1.0, 0), 12, 0.3, 0.8, 0.3, 0.05);
+        world.spawnParticle(Particle.ELECTRIC_SPARK, at.clone().add(0, 0.2, 0), 30, 0.6, 0.2, 0.6, 0.2);
+        world.playSound(at, Sound.ENTITY_LIGHTNING_BOLT_IMPACT, SoundCategory.PLAYERS, 0.8f, 1.4f);
     }
 
     private void zap(Player owner, LivingEntity target, double damage, DamageType type) {

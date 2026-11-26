@@ -114,6 +114,8 @@ public final class ZeusDiscFlight {
     private final Map<UUID, Integer> lastHitTick = new HashMap<>();
     /** Entities already struck by lightning on this throw (a primed throw strikes each one once). */
     private final Set<UUID> struck = new HashSet<>();
+    /** The disc only damages one target per throw. */
+    private boolean hitSomeone;
 
     private ItemStack stack;
     private ItemDisplay display;
@@ -489,6 +491,7 @@ public final class ZeusDiscFlight {
                 Comparator.comparingDouble(e -> e.getLocation().toVector().distanceSquared(from)));
 
         for (LivingEntity target : candidates) {
+            if (hitSomeone) return;
             BoundingBox box = target.getBoundingBox().expand(HIT_MARGIN);
             boolean inside = box.contains(from);
             if (!inside
@@ -504,6 +507,7 @@ public final class ZeusDiscFlight {
     }
 
     private void damage(Player owner, LivingEntity target) {
+        hitSomeone = true;
         lastHitTick.put(target.getUniqueId(), age);
         double before = target.getHealth();
         target.damage(DISC_DAMAGE, owner);
