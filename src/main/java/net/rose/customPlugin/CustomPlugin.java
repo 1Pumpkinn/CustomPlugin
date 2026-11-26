@@ -3,14 +3,17 @@ package net.rose.customPlugin;
 import net.rose.customPlugin.command.WeaponCommand;
 import net.rose.customPlugin.item.KillToken;
 import net.rose.customPlugin.effect.AxeSpinEffect;
+import net.rose.customPlugin.effect.ChainEffects;
 import net.rose.customPlugin.effect.EruptionEffect;
 import net.rose.customPlugin.effect.FrostEffects;
 import net.rose.customPlugin.item.FrostSpear;
+import net.rose.customPlugin.item.MetalicMace;
 import net.rose.customPlugin.item.TideBlade;
 import net.rose.customPlugin.item.VolcanicAxe;
 import net.rose.customPlugin.listener.EgapListener;
 import net.rose.customPlugin.listener.FrostSpearListener;
 import net.rose.customPlugin.listener.KillTokenListener;
+import net.rose.customPlugin.listener.MetalicMaceListener;
 import net.rose.customPlugin.listener.StunListener;
 import net.rose.customPlugin.listener.TideBladeListener;
 import net.rose.customPlugin.listener.VolcanicAxeListener;
@@ -25,6 +28,8 @@ public final class CustomPlugin extends JavaPlugin {
     private VolcanicAxe volcanicAxe;
     private FrostSpear frostSpear;
     private FrostEffects frostEffects;
+    private MetalicMace metalicMace;
+    private ChainEffects chainEffects;
     private CooldownBars cooldownBars;
     private EruptionEffect eruptionEffect;
     private AxeSpinEffect axeSpinEffect;
@@ -36,6 +41,8 @@ public final class CustomPlugin extends JavaPlugin {
         this.volcanicAxe = new VolcanicAxe(this);
         this.frostSpear = new FrostSpear(this);
         this.frostEffects = new FrostEffects(this);
+        this.metalicMace = new MetalicMace(this);
+        this.chainEffects = new ChainEffects(this);
         this.cooldownBars = new CooldownBars(this);
         this.eruptionEffect = new EruptionEffect(this);
         this.axeSpinEffect = new AxeSpinEffect(this);
@@ -47,9 +54,11 @@ public final class CustomPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(
                 new FrostSpearListener(this, frostSpear, cooldownBars, frostEffects), this);
         getServer().getPluginManager().registerEvents(
+                new MetalicMaceListener(this, metalicMace, cooldownBars, chainEffects), this);
+        getServer().getPluginManager().registerEvents(
                 new VolcanicAxeListener(volcanicAxe, cooldownBars, eruptionEffect, axeSpinEffect), this);
 
-        WeaponCommand weaponCommand = new WeaponCommand(tideBlade, volcanicAxe, frostSpear);
+        WeaponCommand weaponCommand = new WeaponCommand(tideBlade, volcanicAxe, frostSpear, metalicMace);
         PluginCommand command = getCommand("weapon");
         if (command != null) {
             command.setExecutor(weaponCommand);
@@ -63,6 +72,7 @@ public final class CustomPlugin extends JavaPlugin {
         if (eruptionEffect != null) eruptionEffect.removeAll();
         if (axeSpinEffect != null) axeSpinEffect.removeAll();
         if (frostEffects != null) frostEffects.shutdown();
+        if (chainEffects != null) chainEffects.shutdown();
     }
 
     public KillToken getKillToken() {
@@ -75,6 +85,10 @@ public final class CustomPlugin extends JavaPlugin {
 
     public FrostSpear getFrostSpear() {
         return frostSpear;
+    }
+
+    public MetalicMace getMetalicMace() {
+        return metalicMace;
     }
 
     public TideBlade getTideBlade() {
