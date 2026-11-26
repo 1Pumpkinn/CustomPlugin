@@ -226,7 +226,7 @@ public final class PetalEffect {
 
     private ItemDisplay spawnDisplay(Location at) {
         return at.getWorld().spawn(at, ItemDisplay.class, d -> {
-            d.setItemStack(new ItemStack(Material.PINK_PETALS));
+            d.setItemStack(new ItemStack(Material.CHERRY_LEAVES));
             d.setBillboard(Display.Billboard.CENTER);
             d.setBrightness(new Display.Brightness(15, 15));
             d.setTeleportDuration(2);
