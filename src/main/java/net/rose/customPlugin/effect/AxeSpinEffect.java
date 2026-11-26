@@ -38,12 +38,13 @@ public final class AxeSpinEffect {
     private static final double ORBIT_RADIUS = 2.4;                   // distance of the axe's centre
     private static final float AXE_SCALE = 1.8f;
     private static final double HIT_RADIUS = 1.4;
-    // ~1 orbit per second. Negative = counter-clockwise from above, which makes the blade edge lead.
+    // ~1.4 orbits per second. Negative = counter-clockwise from above, which makes the blade edge lead.
     // Flip the sign if the blade ever looks like it's trailing again.
-    private static final double SPIN_PER_TICK = -Math.toRadians(18);
+    private static final double SPIN_PER_TICK = -Math.toRadians(26);
     private static final double HIT_DAMAGE = 1.5;
     private static final int BURN_TICKS = 80;                         // 4s
     private static final int HIT_INTERVAL_TICKS = 15;                 // per victim
+    private static final int SHIELD_DISABLE_TICKS = 100;              // 5s, same as a vanilla axe
 
     /**
      * Turns the axe about its own centre in 90 degree steps if the head/blade points the wrong
@@ -173,6 +174,13 @@ public final class AxeSpinEffect {
                 new Vector3f(AXE_SCALE, AXE_SCALE, AXE_SCALE), new Quaternionf());
     }
 
+    /** Knocks the shield down and puts it on cooldown, like a vanilla axe hit. */
+    private static void breakShield(Player victim) {
+        victim.setCooldown(Material.SHIELD, SHIELD_DISABLE_TICKS);
+        victim.clearActiveItem();
+        victim.getWorld().playSound(victim.getLocation(), Sound.ITEM_SHIELD_BREAK, 1f, 1f);
+    }
+
     private void hitAround(Player caster, Location at, Map<UUID, Integer> lastHit, int ticks) {
         for (LivingEntity entity : at.getNearbyLivingEntities(HIT_RADIUS, HIT_RADIUS, HIT_RADIUS)) {
             if (!Targets.isValidPlayer(caster, entity)) continue;
@@ -180,6 +188,8 @@ public final class AxeSpinEffect {
             Integer last = lastHit.get(entity.getUniqueId());
             if (last != null && ticks - last < HIT_INTERVAL_TICKS) continue;
             lastHit.put(entity.getUniqueId(), ticks);
+
+            if (entity instanceof Player victim && victim.isBlocking()) breakShield(victim);
 
             entity.damage(HIT_DAMAGE,
                     DamageSource.builder(DamageType.MAGIC)

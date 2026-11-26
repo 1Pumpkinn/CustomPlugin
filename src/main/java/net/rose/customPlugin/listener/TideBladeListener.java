@@ -5,12 +5,14 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.rose.customPlugin.item.TideBlade;
 import net.rose.customPlugin.util.CooldownBars;
+import net.rose.customPlugin.util.Targets;
+import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
+import org.bukkit.World;
 import org.bukkit.damage.DamageSource;
 import org.bukkit.damage.DamageType;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -23,6 +25,7 @@ import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
 import java.util.HashMap;
@@ -42,6 +45,7 @@ public final class TideBladeListener implements Listener {
 
     // --- Geyser ---
     private static final int GEYSER_RANGE = 20;
+    private static final double GEYSER_RAY_SIZE = 1.0;       // how far off your crosshair a player can be and still count
     private static final double GEYSER_LAUNCH_VELOCITY = 1.2;
     private static final int GEYSER_COLUMN_TICKS = 12;
     private static final long GEYSER_COOLDOWN_MS = 20_000;
@@ -172,11 +176,25 @@ public final class TideBladeListener implements Listener {
 
     // ----------------------------------------------------------------- Geyser
 
+    /** First valid player near the line of sight (generous aim), stopped by walls. */
+    private static Player findTarget(Player player) {
+        World world = player.getWorld();
+        Location eye = player.getEyeLocation();
+        Vector dir = eye.getDirection();
+
+        RayTraceResult blocks = world.rayTraceBlocks(eye, dir, GEYSER_RANGE, FluidCollisionMode.NEVER, true);
+        double maxDistance = blocks == null ? GEYSER_RANGE : blocks.getHitPosition().distance(eye.toVector());
+
+        RayTraceResult hit = world.rayTraceEntities(eye, dir, maxDistance, GEYSER_RAY_SIZE,
+                e -> Targets.isValidPlayer(player, e));
+        return hit != null && hit.getHitEntity() instanceof Player target ? target : null;
+    }
+
     private void useGeyser(Player player) {
         if (cooldowns.isOnCooldown(player, GEYSER_ID)) return; // boss bar already shows the time left
 
-        Entity looking = player.getTargetEntity(GEYSER_RANGE);
-        if (!(looking instanceof Player target)) {
+        Player target = findTarget(player);
+        if (target == null) {
             player.sendActionBar(Component.text("Look at a player to use Geyser", NamedTextColor.RED));
             return;
         }

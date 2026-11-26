@@ -37,7 +37,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public final class EruptionEffect {
 
     // --- Gameplay ---
-    private static final int WARNING_TICKS = 14;
+    private static final int WARNING_TICKS = 6;
     private static final double RADIUS = 6.0;
     // Centre of the blast hits for 3 hearts, everyone else caught in it takes 2 hearts.
     private static final double DAMAGE = 6.0;
