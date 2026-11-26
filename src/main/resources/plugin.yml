@@ -16,8 +16,8 @@ commands:
     permission: customplugin.weapon
 
   weaponpack:
-    description: Get the weapon texture pack (reload re-reads the config)
-    usage: /weaponpack [reload]
+    description: Get the weapon texture pack (status shows the pack server, reload rebuilds it)
+    usage: /weaponpack [status|reload]
     permission: customplugin.weaponpack
 
 permissions:

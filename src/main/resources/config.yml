@@ -1,15 +1,17 @@
-# Weapon texture pack. The pack lives in the repo under resourcepack/ and is built into CustomPlugin-Pack.zip.
+# Weapon texture pack. The pack is bundled inside this plugin's jar (src/main/resources/customplugin/) and served
+# by a tiny built-in web server, so there is nothing to upload or link. Players only re-download it when it changes.
+# After editing this section run /weaponpack reload.
 resource-pack:
   # Set to false to stop sending the pack.
   enabled: true
-  # Direct download link to the zip. The default is the zip in the CustomPlugin repo (it works once the pack is pushed
-  # to master); point it at any other direct link to host the pack yourself.
-  url: "https://raw.githubusercontent.com/1Pumpkinn/CustomPlugin/master/resourcepack/CustomPlugin-Pack.zip"
-  # SHA-1 of the zip (40 hex characters). Leave blank and the plugin works it out by downloading the zip on startup/reload.
-  sha1: ""
-  # Players who decline (or fail to download) the pack are kicked. Only applied when the hash is known.
+  # What players connect to for the download: your server's public IP or domain, without http:// or a port
+  # (use localhost when testing on your own PC).
+  host: localhost
+  # TCP port the plugin opens for the download. It has to be open / forwarded on your server.
+  port: 8080
+  # Interface to listen on (0.0.0.0 = all).
+  bind-address: 0.0.0.0
+  # Players who decline (or fail to download) the pack are kicked.
   required: false
   # Text shown on the client's resource pack prompt.
   prompt: "CustomPlugin weapon textures"
-  # Ticks to wait after a player joins before the pack is sent.
-  send-delay-ticks: 20

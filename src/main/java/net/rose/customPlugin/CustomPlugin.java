@@ -23,7 +23,7 @@ import net.rose.customPlugin.listener.TideBladeListener;
 import net.rose.customPlugin.listener.TricksterBowListener;
 import net.rose.customPlugin.listener.VolcanicAxeListener;
 import net.rose.customPlugin.listener.ZeusDiscListener;
-import net.rose.customPlugin.pack.ResourcePackAssigner;
+import net.rose.customPlugin.pack.ResourcePackManager;
 import net.rose.customPlugin.command.WeaponPackCommand;
 import net.rose.customPlugin.util.CooldownBars;
 import org.bukkit.command.PluginCommand;
@@ -39,7 +39,7 @@ public final class CustomPlugin extends JavaPlugin {
     private MetalicMace metalicMace;
     private TricksterBow tricksterBow;
     private ZeusDisc zeusDisc;
-    private ResourcePackAssigner packAssigner;
+    private ResourcePackManager packManager;
     private ZeusDiscListener zeusDiscListener;
     private ChainEffects chainEffects;
     private CooldownBars cooldownBars;
@@ -77,12 +77,12 @@ public final class CustomPlugin extends JavaPlugin {
                 new VolcanicAxeListener(volcanicAxe, cooldownBars, eruptionEffect, axeSpinEffect), this);
 
         saveDefaultConfig();
-        this.packAssigner = new ResourcePackAssigner(this);
-        packAssigner.load();
-        getServer().getPluginManager().registerEvents(packAssigner, this);
+        // The pack is bundled in this jar and served by a built-in HTTP server (see resource-pack in config.yml).
+        this.packManager = new ResourcePackManager(this, getFile());
+        packManager.start();
         PluginCommand packCommand = getCommand("weaponpack");
         if (packCommand != null) {
-            WeaponPackCommand weaponPackCommand = new WeaponPackCommand(packAssigner);
+            WeaponPackCommand weaponPackCommand = new WeaponPackCommand(packManager);
             packCommand.setExecutor(weaponPackCommand);
             packCommand.setTabCompleter(weaponPackCommand);
         }
@@ -97,6 +97,7 @@ public final class CustomPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (packManager != null) packManager.stop();
         if (zeusDiscListener != null) zeusDiscListener.shutdown();
         if (cooldownBars != null) cooldownBars.shutdown();
         if (eruptionEffect != null) eruptionEffect.removeAll();
