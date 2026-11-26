@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-/** The Zeus Disc's electricity: the primed lightning strike, and the spark-chain passive. Players and mobs are both hit. */
+/** The Zeus Disc's electricity: the primed real-lightning strike, and the particle spark-chain passive. Players and mobs are both hit. */
 public final class ZeusLightning {
 
     private static final double STRIKE_DAMAGE = 5.0;        // same as a vanilla bolt, 2.5 hearts
@@ -35,9 +35,9 @@ public final class ZeusLightning {
         this.plugin = plugin;
     }
 
-    /** A bolt on the target: visual only, then the damage is dealt here so it is credited to the thrower. */
+    /** A real lightning bolt on the target, visual only (no fire, no vanilla damage); the damage is dealt here so it is credited to the thrower. */
     public void strike(Player owner, LivingEntity target) {
-        bolt(target.getLocation());
+        target.getWorld().strikeLightningEffect(target.getLocation());
         zap(owner, target, STRIKE_DAMAGE, DamageType.LIGHTNING_BOLT);
     }
 
@@ -101,21 +101,6 @@ public final class ZeusLightning {
         Location chest = target.getLocation().add(0, target.getHeight() * 0.5, 0);
         world.spawnParticle(Particle.ELECTRIC_SPARK, chest, 18, 0.3, 0.4, 0.3, 0.15);
         world.playSound(chest, Sound.ENTITY_LIGHTNING_BOLT_IMPACT, SoundCategory.PLAYERS, 0.3f, 1.9f);
-    }
-
-    /** A lightning-looking strike made only of particles and sound: no real bolt entity, no fire, no block damage. */
-    private void bolt(Location at) {
-        World world = at.getWorld();
-        // A jagged column of sparks from the sky down to the target.
-        for (double y = 0; y <= 12; y += 0.5) {
-            double jitterX = (Math.random() - 0.5) * 0.5;
-            double jitterZ = (Math.random() - 0.5) * 0.5;
-            world.spawnParticle(Particle.ELECTRIC_SPARK, at.getX() + jitterX, at.getY() + y, at.getZ() + jitterZ,
-                    2, 0.05, 0.05, 0.05, 0.0);
-        }
-        world.spawnParticle(Particle.END_ROD, at.clone().add(0, 1.0, 0), 12, 0.3, 0.8, 0.3, 0.05);
-        world.spawnParticle(Particle.ELECTRIC_SPARK, at.clone().add(0, 0.2, 0), 30, 0.6, 0.2, 0.6, 0.2);
-        world.playSound(at, Sound.ENTITY_LIGHTNING_BOLT_IMPACT, SoundCategory.PLAYERS, 0.8f, 1.4f);
     }
 
     private void zap(Player owner, LivingEntity target, double damage, DamageType type) {
