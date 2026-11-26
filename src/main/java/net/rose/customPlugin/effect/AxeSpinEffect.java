@@ -3,6 +3,7 @@ package net.rose.customPlugin.effect;
 import net.rose.customPlugin.util.Targets;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.World;
@@ -67,7 +68,7 @@ public final class AxeSpinEffect {
 
         World world = caster.getWorld();
         ItemDisplay display = world.spawn(anchor(caster), ItemDisplay.class, d -> {
-            d.setItemStack(new ItemStack(Material.NETHERITE_AXE));
+            d.setItemStack(displayItem());
             d.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.FIXED);
             d.setTransformation(transform(0));
             d.setBrightness(new Display.Brightness(15, 15));
@@ -126,6 +127,17 @@ public final class AxeSpinEffect {
         }.runTaskTimer(plugin, 0L, 1L);
 
         active.put(caster.getUniqueId(), new Active(task, display));
+    }
+
+    /**
+     * The item shown by the orbiting display. It needs the same item model as the real Volcanic Axe
+     * (customplugin:volcanic_axe, from the texture pack) or the client falls back to the vanilla
+     * netherite axe.
+     */
+    private ItemStack displayItem() {
+        ItemStack item = new ItemStack(Material.NETHERITE_AXE);
+        item.editMeta(meta -> meta.setItemModel(new NamespacedKey(plugin, "volcanic_axe")));
+        return item;
     }
 
     public void stop(Player caster) {

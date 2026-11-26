@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/bow",
+  "textures": {
+    "layer0": "customplugin:item/trickster_bow_pulling_2"
+  }
+}
