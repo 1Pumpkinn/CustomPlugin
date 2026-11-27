@@ -29,7 +29,8 @@ public final class Legendaries {
                 entry(plugin, "trickster_bow", "Trickster Bow", NamedTextColor.LIGHT_PURPLE),
                 entry(plugin, "zeus_disc", "Zeus Disc", NamedTextColor.YELLOW),
                 entry(plugin, "petal_blade", "Petal Blade", PetalBlade.PINK),
-                entry(plugin, "bloodthirst_scythe", "Bloodthirst Scythe", BloodthirstScythe.BLOOD));
+                entry(plugin, "bloodthirst_scythe", "Bloodthirst Scythe", BloodthirstScythe.BLOOD),
+                entry(plugin, "hat", "Hat", Hat.COLOR));
     }
 
     /** Colored names of the distinct custom weapons anywhere in the player's inventory, armor and offhand included. */

@@ -1,8 +1,11 @@
 package net.rose.customPlugin;
 
 import net.rose.customPlugin.command.WeaponCommand;
+import net.rose.customPlugin.effect.HatEffects;
+import net.rose.customPlugin.effect.HatHeadDisplay;
 import net.rose.customPlugin.effect.SoulFreezeEffect;
 import net.rose.customPlugin.item.BloodthirstScythe;
+import net.rose.customPlugin.item.Hat;
 import net.rose.customPlugin.item.KillToken;
 import net.rose.customPlugin.effect.AxeSpinEffect;
 import net.rose.customPlugin.effect.ChainEffects;
@@ -20,6 +23,7 @@ import net.rose.customPlugin.item.VolcanicAxe;
 import net.rose.customPlugin.item.ZeusDisc;
 import net.rose.customPlugin.listener.BloodthirstScytheListener;
 import net.rose.customPlugin.listener.DroppedItemGlow;
+import net.rose.customPlugin.listener.HatListener;
 import net.rose.customPlugin.listener.EgapListener;
 import net.rose.customPlugin.listener.FrostSpearListener;
 import net.rose.customPlugin.listener.KillTokenListener;
@@ -60,6 +64,9 @@ public final class CustomPlugin extends JavaPlugin {
     private PetalBlade petalBlade;
     private PetalEffect petalEffect;
     private BloodthirstScythe bloodthirstScythe;
+    private Hat hat;
+    private HatEffects hatEffects;
+    private HatHeadDisplay hatHead;
     private DeathMessages deathMessages;
 
     @Override
@@ -81,6 +88,9 @@ public final class CustomPlugin extends JavaPlugin {
         this.petalBlade = new PetalBlade(this);
         this.petalEffect = new PetalEffect(this, deathMessages);
         this.bloodthirstScythe = new BloodthirstScythe(this);
+        this.hat = new Hat(this);
+        this.hatEffects = new HatEffects(this, hat, deathMessages);
+        this.hatHead = new HatHeadDisplay(this, hat, hatEffects);
 
         getServer().getPluginManager().registerEvents(new KillTokenListener(killToken), this);
         getServer().getPluginManager().registerEvents(deathMessages, this);
@@ -105,6 +115,8 @@ public final class CustomPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new PetalBladeListener(petalBlade, cooldownBars, petalEffect), this);
         getServer().getPluginManager().registerEvents(
                 new BloodthirstScytheListener(bloodthirstScythe, cooldownBars, frostEffects, new SoulFreezeEffect(this)), this);
+        getServer().getPluginManager().registerEvents(new HatListener(hat, cooldownBars, hatEffects), this);
+        hatHead.start();
 
         saveDefaultConfig();
         // The pack is bundled in this jar and served by a built-in HTTP server (see resource-pack in config.yml).
@@ -117,7 +129,7 @@ public final class CustomPlugin extends JavaPlugin {
             packCommand.setTabCompleter(weaponPackCommand);
         }
 
-        WeaponCommand weaponCommand = new WeaponCommand(tideBlade, volcanicAxe, frostSpear, metalicMace, tricksterBow, zeusDisc, petalBlade, bloodthirstScythe);
+        WeaponCommand weaponCommand = new WeaponCommand(tideBlade, volcanicAxe, frostSpear, metalicMace, tricksterBow, zeusDisc, petalBlade, bloodthirstScythe, hat);
         PluginCommand command = getCommand("weapon");
         if (command != null) {
             command.setExecutor(weaponCommand);
@@ -133,6 +145,8 @@ public final class CustomPlugin extends JavaPlugin {
         if (eruptionEffect != null) eruptionEffect.removeAll();
         if (axeSpinEffect != null) axeSpinEffect.removeAll();
         if (petalEffect != null) petalEffect.removeAll();
+        if (hatHead != null) hatHead.stop();
+        if (hatEffects != null) hatEffects.removeAll();
         if (frostEffects != null) frostEffects.shutdown();
         if (chainEffects != null) chainEffects.shutdown();
     }
@@ -159,6 +173,10 @@ public final class CustomPlugin extends JavaPlugin {
 
     public PetalBlade getPetalBlade() {
         return petalBlade;
+    }
+
+    public Hat getHat() {
+        return hat;
     }
 
     public BloodthirstScythe getBloodthirstScythe() {

@@ -4,6 +4,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.rose.customPlugin.item.BloodthirstScythe;
 import net.rose.customPlugin.item.FrostSpear;
+import net.rose.customPlugin.item.Hat;
 import net.rose.customPlugin.item.MetalicMace;
 import net.rose.customPlugin.item.PetalBlade;
 import net.rose.customPlugin.item.TideBlade;
@@ -31,7 +32,7 @@ public final class WeaponCommand implements CommandExecutor, TabCompleter {
     private final Map<String, Supplier<ItemStack>> weapons = new LinkedHashMap<>();
 
     public WeaponCommand(TideBlade tideBlade, VolcanicAxe volcanicAxe, FrostSpear frostSpear, MetalicMace metalicMace, TricksterBow tricksterBow, ZeusDisc zeusDisc,
-                         PetalBlade petalBlade, BloodthirstScythe bloodthirstScythe) {
+                         PetalBlade petalBlade, BloodthirstScythe bloodthirstScythe, Hat hat) {
         weapons.put("tideblade", tideBlade::create);
         weapons.put("volcanicaxe", volcanicAxe::create);
         weapons.put("frostspear", frostSpear::create);
@@ -40,6 +41,7 @@ public final class WeaponCommand implements CommandExecutor, TabCompleter {
         weapons.put("zeusdisc", zeusDisc::create);
         weapons.put("petalblade", petalBlade::create);
         weapons.put("bloodthirstscythe", bloodthirstScythe::create);
+        weapons.put("hat", hat::create);
         // Register future weapons here: weapons.put("name", item::create);
     }
 

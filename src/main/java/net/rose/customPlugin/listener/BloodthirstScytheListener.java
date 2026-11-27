@@ -8,6 +8,7 @@ import net.rose.customPlugin.effect.SoulFreezeEffect;
 import net.rose.customPlugin.item.BloodthirstScythe;
 import net.rose.customPlugin.util.CooldownBars;
 import net.rose.customPlugin.util.Targets;
+import net.rose.customPlugin.util.TrueDamage;
 import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -84,6 +85,7 @@ public final class BloodthirstScytheListener implements Listener {
     public void onHit(EntityDamageByEntityEvent event) {
         if (event.getCause() != EntityDamageEvent.DamageCause.ENTITY_ATTACK) return;
         if (!(event.getDamager() instanceof Player attacker)) return;
+        if (TrueDamage.isTrueDamage(event.getEntity())) return; // ability damage is not a melee hit
         if (!Targets.isValidTarget(attacker, event.getEntity())) return;
         if (!scythe.isBloodthirstScythe(attacker.getInventory().getItemInMainHand())) return;
 
