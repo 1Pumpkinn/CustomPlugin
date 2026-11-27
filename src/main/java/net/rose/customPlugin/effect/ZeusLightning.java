@@ -8,6 +8,7 @@ import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.World;
+import org.bukkit.damage.DamageSource;
 import org.bukkit.damage.DamageType;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -24,7 +25,7 @@ import java.util.UUID;
 public final class ZeusLightning {
 
     private static final double STRIKE_DAMAGE = 8.0;        // true damage, 4 hearts (the disc itself is 3 hearts)
-    private static final double CHAIN_DAMAGE = 1.0;         // half a heart
+    private static final double CHAIN_DAMAGE = 1.0;         // half a heart, a normal hit (armor applies)
     private static final double CHAIN_RANGE = 6.0;          // anything this close to a chained target gets zapped too
     private static final int CHAIN_WAVES = 4;               // how many times it can spread outwards
     private static final int CHAIN_MAX_TARGETS = 12;        // per hit, so a crowd can't turn it into a server-wide storm
@@ -46,8 +47,8 @@ public final class ZeusLightning {
 
     /**
      * Chain passive: no bolt, just sparks. The hit target (player or mob) arcs sparks out to every player and mob
-     * within range of anything it has already reached, and each one it reaches takes half a heart.
-     * Only the primed strike calls down a lightning bolt.
+     * within range of anything it has already reached, and each one it reaches takes half a heart of normal damage.
+     * Only the primed strike calls down a lightning bolt, and only the primed strike is true damage.
      */
     public void chain(Player owner, LivingEntity origin) {
         if (!hasTargetNearby(owner, origin)) return; // nothing to jump to: no sparks at all
@@ -90,7 +91,7 @@ public final class ZeusLightning {
 
                 arc(from, candidate);
                 sparks(candidate);
-                zap(owner, candidate, CHAIN_DAMAGE, DamageType.MAGIC); // true damage: half a heart
+                hit(owner, candidate, CHAIN_DAMAGE);
             }
         }
 
@@ -105,6 +106,14 @@ public final class ZeusLightning {
         Location chest = target.getLocation().add(0, target.getHeight() * 0.5, 0);
         world.spawnParticle(Particle.ELECTRIC_SPARK, chest, 18, 0.3, 0.4, 0.3, 0.15);
         world.playSound(chest, Sound.ENTITY_LIGHTNING_BOLT_IMPACT, SoundCategory.PLAYERS, 0.3f, 1.9f);
+    }
+
+    /** A normal hit from the thrower: armor, enchantments, resistance, absorption and i-frames all apply. */
+    private void hit(Player owner, LivingEntity target, double damage) {
+        deaths.mark(target, owner, DeathMessages.ZEUS_DISC);
+        DamageSource source = DamageSource.builder(DamageType.PLAYER_ATTACK)
+                .withCausingEntity(owner).withDirectEntity(owner).build();
+        target.damage(damage, source);
     }
 
     private void zap(Player owner, LivingEntity target, double damage, DamageType type) {

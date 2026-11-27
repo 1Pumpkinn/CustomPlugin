@@ -3,17 +3,7 @@ package net.rose.customPlugin.command;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 
-import net.rose.customPlugin.item.*;
-import net.rose.customPlugin.item.axe.VolcanicAxe;
-import net.rose.customPlugin.item.bow.TricksterBow;
-import net.rose.customPlugin.item.disc.ZeusDisc;
-import net.rose.customPlugin.item.mace.MetalicMace;
-import net.rose.customPlugin.item.misc.Hat;
-import net.rose.customPlugin.item.scythe.BloodthirstScythe;
-import net.rose.customPlugin.item.spear.FrostSpear;
-import net.rose.customPlugin.item.sword.PetalBlade;
-import net.rose.customPlugin.item.sword.TideBlade;
-import net.rose.customPlugin.item.trident.TempestTrident;
+import net.rose.customPlugin.item.WeaponRegistry;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -23,43 +13,30 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.function.Supplier;
 
 /** /weapon <name> [player] - gives a custom weapon. */
 public final class WeaponCommand implements CommandExecutor, TabCompleter {
 
-    private final Map<String, Supplier<ItemStack>> weapons = new LinkedHashMap<>();
+    private final WeaponRegistry weapons;
 
-    public WeaponCommand(TideBlade tideBlade, VolcanicAxe volcanicAxe, FrostSpear frostSpear, MetalicMace metalicMace, TricksterBow tricksterBow, ZeusDisc zeusDisc,
-                         PetalBlade petalBlade, BloodthirstScythe bloodthirstScythe, TempestTrident tempestTrident, Hat hat) {
-        weapons.put("tideblade", tideBlade::create);
-        weapons.put("volcanicaxe", volcanicAxe::create);
-        weapons.put("frostspear", frostSpear::create);
-        weapons.put("metalicmace", metalicMace::create);
-        weapons.put("tricksterbow", tricksterBow::create);
-        weapons.put("zeusdisc", zeusDisc::create);
-        weapons.put("petalblade", petalBlade::create);
-        weapons.put("bloodthirstscythe", bloodthirstScythe::create);
-        weapons.put("tempesttrident", tempestTrident::create);
-        weapons.put("hat", hat::create);
-        // Register future weapons here: weapons.put("name", item::create);
+    public WeaponCommand(WeaponRegistry weapons) {
+        this.weapons = weapons;
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length < 1) {
-            sender.sendMessage(Component.text("Usage: /" + label + " <" + String.join("|", weapons.keySet())
+            sender.sendMessage(Component.text("Usage: /" + label + " <" + String.join("|", weapons.ids())
                     + "> [player]", NamedTextColor.RED));
             return true;
         }
 
-        Supplier<ItemStack> supplier = weapons.get(args[0].toLowerCase(Locale.ROOT));
-        if (supplier == null) {
-            sender.sendMessage(Component.text("Unknown weapon. Available: " + String.join(", ", weapons.keySet()),
+        String name = args[0].toLowerCase(Locale.ROOT);
+        if (!weapons.has(name)) {
+            sender.sendMessage(Component.text("Unknown weapon. Available: " + String.join(", ", weapons.ids()),
                     NamedTextColor.RED));
             return true;
         }
@@ -80,12 +57,12 @@ public final class WeaponCommand implements CommandExecutor, TabCompleter {
         }
 
         // Full inventory -> the leftover drops at the target's feet
-        Map<Integer, ItemStack> leftover = target.getInventory().addItem(supplier.get());
+        Map<Integer, ItemStack> leftover = target.getInventory().addItem(weapons.create(name));
         for (ItemStack stack : leftover.values()) {
             target.getWorld().dropItemNaturally(target.getLocation(), stack);
         }
 
-        sender.sendMessage(Component.text("Gave " + args[0].toLowerCase(Locale.ROOT) + " to " + target.getName(),
+        sender.sendMessage(Component.text("Gave " + name + " to " + target.getName(),
                 NamedTextColor.GREEN));
         return true;
     }
@@ -95,7 +72,7 @@ public final class WeaponCommand implements CommandExecutor, TabCompleter {
         List<String> out = new ArrayList<>();
         if (args.length == 1) {
             String prefix = args[0].toLowerCase(Locale.ROOT);
-            for (String name : weapons.keySet()) {
+            for (String name : weapons.ids()) {
                 if (name.startsWith(prefix)) out.add(name);
             }
         } else if (args.length == 2) {

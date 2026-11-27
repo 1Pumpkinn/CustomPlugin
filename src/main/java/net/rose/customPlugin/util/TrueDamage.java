@@ -22,6 +22,7 @@ import java.util.UUID;
  * True damage helper for ability damage (players and mobs).
  *
  * <p>Ignores armor, enchantments (protection etc), the resistance effect, shield blocking and the hard hat.
+ * Absorption hearts still soak it first (use {@link Builder#bypassAbsorption(boolean)} to skip them).
  * It still goes through the normal vanilla damage pipeline ({@link EntityDamageEvent}), so the hurt
  * animation and sound play, totems still trigger, other plugins can still cancel it, and kill credit and
  * death messages work when an attacker is supplied.
@@ -64,7 +65,7 @@ public final class TrueDamage implements Listener {
         private Entity attacker = null;
         private DamageType type = DamageType.GENERIC;
         private boolean ignoreIFrames = true;
-        private boolean bypassAbsorption = true;
+        private boolean bypassAbsorption = false;
         private Vector shieldDirection = null;
 
         private Builder(double amount) {
@@ -88,7 +89,7 @@ public final class TrueDamage implements Listener {
             return this;
         }
 
-        /** If true (default) absorption hearts are skipped and the damage hits real health, like everything else true damage ignores. */
+        /** If true absorption hearts are skipped and the damage hits real health. Default false: absorption hearts soak it. */
         public Builder bypassAbsorption(boolean bypass) {
             this.bypassAbsorption = bypass;
             return this;
@@ -144,25 +145,36 @@ public final class TrueDamage implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    @SuppressWarnings("deprecation")
     public void onDamage(EntityDamageEvent event) {
         Pending pending = PENDING.get(event.getEntity().getUniqueId());
         if (pending == null) return;
 
+        makeTrue(event, pending.amount(), pending.bypassAbsorption());
+    }
+
+    /**
+     * Turns an event that is being processed into true damage that still gets soaked by absorption hearts:
+     * the base damage is whatever the event already carries, everything that would reduce it is zeroed.
+     */
+    public static void makeTrue(EntityDamageEvent event) {
+        makeTrue(event, event.getDamage(DamageModifier.BASE), false);
+    }
+
+    @SuppressWarnings("deprecation")
+    private static void makeTrue(EntityDamageEvent event, double amount, boolean bypassAbsorption) {
         for (DamageModifier modifier : DamageModifier.values()) {
             if (modifier == DamageModifier.BASE) continue;
             if (!event.isApplicable(modifier)) continue;
             event.setDamage(modifier, 0);
         }
-        event.setDamage(DamageModifier.BASE, pending.amount());
+        event.setDamage(DamageModifier.BASE, amount);
 
-        // Absorption hearts soak true damage like any other damage. The vanilla absorption modifier was worked out
-        // before the other modifiers were zeroed (so from a smaller number), which let part of the hit leak through
-        // to real health: recompute it from the full amount.
-        if (!pending.bypassAbsorption()
+        // The vanilla absorption modifier was worked out before the other modifiers were zeroed (so from a smaller
+        // number), which let part of the hit leak through to real health: recompute it from the full amount.
+        if (!bypassAbsorption
                 && event.isApplicable(DamageModifier.ABSORPTION)
                 && event.getEntity() instanceof LivingEntity living) {
-            double absorbed = Math.min(living.getAbsorptionAmount(), pending.amount());
+            double absorbed = Math.min(living.getAbsorptionAmount(), amount);
             event.setDamage(DamageModifier.ABSORPTION, -absorbed);
         }
     }

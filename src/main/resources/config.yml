@@ -15,3 +15,32 @@ resource-pack:
   required: false
   # Text shown on the client's resource pack prompt.
   prompt: "CustomPlugin weapon textures"
+
+# Points are earned by killing players and spent in the weapon shop (/shop). Balances are kept in points.yml.
+points:
+  # Points the killer gets for every player kill (0 turns it off).
+  per-kill: 1
+
+shop:
+  # Price of every weapon in points, by its /weapon name. A negative price takes the weapon off the shop.
+  prices:
+    tideblade: 10
+    volcanicaxe: 10
+    frostspear: 10
+    metalicmace: 10
+    tricksterbow: 10
+    zeusdisc: 10
+    petalblade: 10
+    bloodthirstscythe: 10
+    tempesttrident: 10
+    hat: 10
+
+# Dropped weapons shoot a beam of particles into the sky so they can be spotted from far away.
+dropped-item-beacon:
+  enabled: true
+  # How tall the beam is, in blocks.
+  height: 48
+  # Blocks between particles in the beam (bigger = fewer particles).
+  spacing: 2.0
+  # How often the beam is redrawn.
+  interval-ticks: 20

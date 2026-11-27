@@ -4,6 +4,7 @@ import net.kyori.adventure.bossbar.BossBar;
 import net.rose.customPlugin.item.bow.TricksterBow;
 import net.rose.customPlugin.util.CooldownBars;
 import net.rose.customPlugin.util.Targets;
+import net.rose.customPlugin.util.TrueDamage;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
@@ -17,7 +18,6 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.event.entity.EntityDamageEvent.DamageModifier;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
@@ -157,17 +157,12 @@ public final class TricksterBowListener implements Listener {
 
     /** Primed shot arrows (the fan and every bounce) deal true damage: armor, enchants and resistance are ignored. */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    @SuppressWarnings("deprecation")
     public void onArrowDamage(EntityDamageByEntityEvent event) {
         if (!(event.getDamager() instanceof Arrow arrow)) return;
         if (!arrow.getPersistentDataContainer().has(primedKey, PersistentDataType.BYTE)) return;
         if (!(event.getEntity() instanceof LivingEntity)) return;
 
-        for (DamageModifier modifier : DamageModifier.values()) {
-            if (modifier == DamageModifier.BASE || modifier == DamageModifier.ABSORPTION) continue;
-            if (!event.isApplicable(modifier)) continue;
-            event.setDamage(modifier, 0);
-        }
+        TrueDamage.makeTrue(event);
     }
 
     @EventHandler

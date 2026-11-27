@@ -20,6 +20,17 @@ commands:
     usage: /weaponpack [status|reload]
     permission: customplugin.weaponpack
 
+  shop:
+    description: Open the weapon shop and buy weapons with points
+    usage: /shop
+    aliases: [ weaponshop ]
+    permission: customplugin.shop
+
+  points:
+    description: Check your points (admins can give, take or set them)
+    usage: /points [give|take|set <player> <amount>]
+    permission: customplugin.points
+
 permissions:
   customplugin.weapon:
     description: Allows use of /weapon
@@ -29,4 +40,13 @@ permissions:
     default: true
   customplugin.weaponpack.reload:
     description: Allows /weaponpack reload
+    default: op
+  customplugin.shop:
+    description: Allows /shop
+    default: true
+  customplugin.points:
+    description: Allows /points
+    default: true
+  customplugin.points.admin:
+    description: Allows /points give, take and set
     default: op
