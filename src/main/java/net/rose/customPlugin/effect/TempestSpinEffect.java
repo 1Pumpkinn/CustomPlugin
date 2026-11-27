@@ -20,6 +20,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Transformation;
 import org.bukkit.util.Vector;
+import org.joml.Matrix3f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
@@ -28,20 +29,32 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * A trident that spins around the victim it hit like a helicopter blade, dealing a small amount of true
- * damage to them every tick. The orbit is done with the display's transformation (the client interpolates
- * it), the same way as {@link AxeSpinEffect}.
+ * A trident that circles the victim it hit with its prongs pointing at them, dealing a small amount of true
+ * damage to them every tick. It is drawn with the real 3D trident model (see {@link #displayItem()}) and hangs
+ * out beyond the victim's hitbox, so it never passes through them. The orbit is done with the display's transformation (the
+ * client interpolates it), the same way as {@link AxeSpinEffect}.
  */
 public final class TempestSpinEffect {
 
     private static final int DURATION_TICKS = 60;                     // 3s
     private static final double TICK_DAMAGE = 0.2;                    // per tick: 0.1 heart, 6 hearts over the full spin
-    private static final double ORBIT_RADIUS = 1.7;
-    private static final float TRIDENT_SCALE = 2.0f;
+    /** Gap between the victim's hitbox and the prong tips. */
+    private static final double TIP_GAP = 0.6;
+    private static final float TRIDENT_SCALE = 1.0f;
+    /** Half the length of the 3D trident at scale 1 (about two blocks long). */
+    private static final double HALF_LENGTH = 0.97 * TRIDENT_SCALE;
     private static final double SPIN_PER_TICK = -Math.toRadians(36);  // 2 orbits per second
 
-    /** Turns the trident about its own centre if its tip points the wrong way (0 = tip outward). */
-    private static final double FACING_OFFSET_DEGREES = 0;
+    /**
+     * How the 3D trident model is laid out in its own space when shown with the NONE transform: the direction
+     * the prongs point, and the direction the prongs spread apart. If it flies sideways or handle-first,
+     * these two are the only things to change.
+     */
+    private static final Vector3f MODEL_TIP_AXIS = new Vector3f(0f, 0f, 1f);
+    private static final Vector3f MODEL_SPREAD_AXIS = new Vector3f(0f, 1f, 0f);
+
+    /** Where the middle of the model sits in its own space (blocks at scale 1); the shaft runs away from the tip. */
+    private static final Vector3f MODEL_CENTER = new Vector3f(0f, 0f, -0.72f);
 
     private record Active(BukkitTask task, ItemDisplay display) {
     }
@@ -61,8 +74,10 @@ public final class TempestSpinEffect {
         World world = victim.getWorld();
         ItemDisplay display = world.spawn(anchor(victim), ItemDisplay.class, d -> {
             d.setItemStack(displayItem());
-            d.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.FIXED);
-            d.setTransformation(transform(0));
+            // NONE is not one of the 2D sprite contexts in items/tempest_trident.json, so it falls through
+            // to the real 3D trident model (FIXED would give the flat sprite).
+            d.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.NONE);
+            d.setTransformation(transform(0, orbitRadius(victim)));
             d.setBrightness(new Display.Brightness(15, 15));
             d.setTeleportDuration(1);
             d.setInterpolationDuration(2);
@@ -87,13 +102,13 @@ public final class TempestSpinEffect {
                 }
 
                 Location centre = anchor(victim);
-                double previous = angle;
+                double radius = orbitRadius(victim);
                 angle += SPIN_PER_TICK;
 
                 display.teleport(centre);
                 display.setInterpolationDelay(0);
                 display.setInterpolationDuration(2);
-                display.setTransformation(transform(angle));
+                display.setTransformation(transform(angle, radius));
 
                 // Damage every tick. Knockback is undone so the victim isn't launched 20 times a second.
                 Vector velocity = victim.getVelocity();
@@ -103,11 +118,11 @@ public final class TempestSpinEffect {
                 }
 
                 World w = centre.getWorld();
-                Location head = orbit(centre, angle, ORBIT_RADIUS + 0.8);
-                w.spawnParticle(Particle.CLOUD, head, 2, 0.1, 0.1, 0.1, 0.01);
-                w.spawnParticle(Particle.ELECTRIC_SPARK, head, 2, 0.15, 0.15, 0.15, 0.05);
-                w.spawnParticle(Particle.CLOUD, orbit(centre, (previous + angle) / 2, ORBIT_RADIUS + 0.8),
-                        1, 0.1, 0.1, 0.1, 0.01);
+                // Sparks at the prongs, a cloud at the handle.
+                Location tip = orbit(centre, angle, radius - HALF_LENGTH);
+                Location tail = orbit(centre, angle, radius + HALF_LENGTH);
+                w.spawnParticle(Particle.ELECTRIC_SPARK, tip, 2, 0.15, 0.15, 0.15, 0.05);
+                w.spawnParticle(Particle.CLOUD, tail, 2, 0.1, 0.1, 0.1, 0.01);
                 if (ticks % 4 == 0) {
                     w.spawnParticle(Particle.SWEEP_ATTACK, centre, 1, 0.6, 0.4, 0.6, 0.0);
                 }
@@ -156,18 +171,37 @@ public final class TempestSpinEffect {
         return centre.clone().add(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
     }
 
-    /** Trident lying flat, centre {@link #ORBIT_RADIUS} from the victim at {@code angle}, tip pointing away from them. */
-    private static Transformation transform(double angle) {
-        Vector3f offset = new Vector3f(
-                (float) (Math.cos(angle) * ORBIT_RADIUS), 0f, (float) (Math.sin(angle) * ORBIT_RADIUS));
+    /** Distance from the victim's centre to the middle of the trident: hitbox edge, gap, then half its length. */
+    private static double orbitRadius(LivingEntity victim) {
+        return victim.getWidth() / 2.0 + TIP_GAP + HALF_LENGTH;
+    }
 
-        // Flat sprite: the tip diagonal points at heading -45 degrees; rotateY(phi) lowers a heading by phi.
-        float yaw = (float) -(angle + Math.toRadians(45 + FACING_OFFSET_DEGREES));
-        Quaternionf rotation = new Quaternionf()
-                .rotateY(yaw)
-                .rotateX((float) Math.toRadians(-90));
+    /**
+     * The trident at {@code angle} on the orbit, lying along the radius with its prongs pointing at the victim
+     * and its handle pointing away, prongs spread sideways.
+     */
+    private static Transformation transform(double angle, double radius) {
+        Vector3f outward = new Vector3f((float) Math.cos(angle), 0f, (float) Math.sin(angle));
+        Vector3f inward = new Vector3f(outward).negate();
+        Vector3f sideways = new Vector3f(-outward.z, 0f, outward.x);
+
+        // Rotation that takes the model's (spread, tip) axes onto the world's (sideways, inward) axes.
+        Matrix3f model = frame(MODEL_SPREAD_AXIS, MODEL_TIP_AXIS);
+        Matrix3f world = frame(sideways, inward);
+        Quaternionf rotation = new Quaternionf().setFromNormalized(world.mul(model.transpose()));
+
+        // Put the middle of the model (not its origin) on the orbit.
+        Vector3f offset = new Vector3f(outward).mul((float) radius);
+        Vector3f centreShift = new Vector3f(MODEL_CENTER).mul(TRIDENT_SCALE).rotate(rotation);
+        offset.sub(centreShift);
 
         return new Transformation(offset, rotation,
                 new Vector3f(TRIDENT_SCALE, TRIDENT_SCALE, TRIDENT_SCALE), new Quaternionf());
+    }
+
+    /** Right-handed orthonormal frame with columns (spread, tip, spread x tip). */
+    private static Matrix3f frame(Vector3f spread, Vector3f tip) {
+        Vector3f third = new Vector3f(spread).cross(tip);
+        return new Matrix3f(spread.x, spread.y, spread.z, tip.x, tip.y, tip.z, third.x, third.y, third.z);
     }
 }
