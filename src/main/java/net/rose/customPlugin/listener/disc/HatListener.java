@@ -134,20 +134,57 @@ public final class HatListener implements Listener {
 
     private void throwPad(Player player) {
         if (cooldowns.isOnCooldown(player, PAD_ID)) return; // boss bar already shows the time left
+        TakenHat taken = takeFromHand(player);
+        if (taken == null) return;
+        try {
+            effects.throwPad(player, taken.item(), taken.slot());
+        } catch (Throwable t) {
+            restore(player, taken, t);
+            return;
+        }
         cooldowns.start(player, PAD_ID, "Bounce Hat", BossBar.Color.GREEN, PAD_COOLDOWN_MS);
-        effects.throwPad(player);
     }
 
     private void throwRazor(Player player) {
         if (cooldowns.isOnCooldown(player, RAZOR_ID)) return;
+        TakenHat taken = takeFromHand(player);
+        if (taken == null) return;
+        try {
+            effects.throwRazor(player, taken.item(), taken.slot(), () ->
+                    cooldowns.start(player, RAZOR_ID, "Razor Hat", BossBar.Color.RED, RAZOR_MISS_COOLDOWN_MS));
+        } catch (Throwable t) {
+            restore(player, taken, t);
+            return;
+        }
         cooldowns.start(player, RAZOR_ID, "Razor Hat", BossBar.Color.RED, RAZOR_COOLDOWN_MS);
-        effects.throwRazor(player, () ->
-                cooldowns.start(player, RAZOR_ID, "Razor Hat", BossBar.Color.RED, RAZOR_MISS_COOLDOWN_MS));
+    }
+
+    /** The hat that was taken out of a hand for a throw, and the slot it came from. */
+    private record TakenHat(ItemStack item, int slot) {
+    }
+
+    /** Takes the hat out of the main hand, like the Zeus Disc does when thrown. Null if the hand holds no hat. */
+    private TakenHat takeFromHand(Player player) {
+        PlayerInventory inventory = player.getInventory();
+        int slot = inventory.getHeldItemSlot();
+        ItemStack held = inventory.getItem(slot);
+        if (!hat.isHat(held)) return null;
+
+        ItemStack thrown = held.clone();
+        thrown.setAmount(1);
+        inventory.setItem(slot, null);
+        return new TakenHat(thrown, slot);
+    }
+
+    /** The throw failed after the hat left the inventory: put it straight back. */
+    private void restore(Player player, TakenHat taken, Throwable cause) {
+        plugin.getLogger().log(Level.SEVERE, "Could not throw the Hat", cause);
+        player.getInventory().setItem(taken.slot(), taken.item());
     }
 
     @EventHandler
     public void onDeath(PlayerDeathEvent event) {
-        effects.cancel(event.getEntity());
+        effects.cancelAndDrop(event.getEntity()); // the hat is not in the inventory, so it drops where it is
     }
 
     @EventHandler

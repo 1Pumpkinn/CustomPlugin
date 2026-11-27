@@ -14,9 +14,12 @@ import org.bukkit.World;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.Item;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.BoundingBox;
@@ -50,8 +53,8 @@ public final class HatEffects {
     private static final float PAD_SCALE = 1.4f;
     private static final double PAD_HALF_WIDTH = 0.5;
     private static final double PAD_ZONE_HEIGHT = 0.45;     // feet inside this much above the floor count as "on it"
-    private static final double BOUNCE_MIN = 1.05;          // launch velocity, blocks/tick
-    private static final double BOUNCE_MAX = 1.8;
+    private static final double BOUNCE_MIN = 1.6;          // launch velocity, blocks/tick
+    private static final double BOUNCE_MAX = 1.6;
     private static final int BOUNCE_COOLDOWN_TICKS = 10;
 
     // --- Razor hat ---
@@ -86,40 +89,53 @@ public final class HatEffects {
         return thrown.contains(player.getUniqueId());
     }
 
-    /** Ends this player's thrown hats right away. */
+    /** Ends this player's thrown hats right away; each hat goes back to its owner (quit, etc.). */
     public void cancel(Player player) {
         for (Job job : new ArrayList<>(jobs)) {
-            if (job.owner.getUniqueId().equals(player.getUniqueId())) job.stop();
+            if (job.owner.getUniqueId().equals(player.getUniqueId())) job.stop(false);
+        }
+    }
+
+    /** Ends this player's thrown hats right away, and drops each one where it is (the owner just died). */
+    public void cancelAndDrop(Player player) {
+        for (Job job : new ArrayList<>(jobs)) {
+            if (job.owner.getUniqueId().equals(player.getUniqueId())) job.stop(true);
         }
     }
 
     /** Ends every thrown hat; call from onDisable. */
     public void removeAll() {
-        for (Job job : new ArrayList<>(jobs)) job.stop();
+        for (Job job : new ArrayList<>(jobs)) job.stop(false);
         lastBounce.clear();
     }
 
     // ------------------------------------------------------------------ Throws
 
-    public void throwPad(Player owner) {
+    /**
+     * @param stack    the hat item, already taken out of the owner's inventory; it is handed back when the hat ends
+     * @param homeSlot the slot it was taken from
+     */
+    public void throwPad(Player owner, ItemStack stack, int homeSlot) {
         Location eye = owner.getEyeLocation();
         Vector direction = eye.getDirection();
         Location start = eye.clone().add(direction.clone().multiply(0.6)).subtract(0, 0.2, 0);
         Vector velocity = direction.clone().multiply(PAD_SPEED).add(new Vector(0, 0.12, 0));
         start.getWorld().playSound(start, Sound.ENTITY_SNOWBALL_THROW, 1f, 0.8f);
-        new PadJob(owner, spawnDisplay(start), start, velocity).begin();
+        new PadJob(owner, spawnDisplay(start), stack, homeSlot, start, velocity).begin();
     }
 
     /**
-     * @param onMiss runs if the hat ends without hitting anyone
+     * @param stack    the hat item, already taken out of the owner's inventory; it is handed back when the hat ends
+     * @param homeSlot the slot it was taken from
+     * @param onMiss   runs if the hat ends without hitting anyone
      */
-    public void throwRazor(Player owner, Runnable onMiss) {
+    public void throwRazor(Player owner, ItemStack stack, int homeSlot, Runnable onMiss) {
         Location eye = owner.getEyeLocation();
         Vector direction = eye.getDirection();
         Location start = eye.clone().add(direction.clone().multiply(0.6)).subtract(0, 0.2, 0);
         Vector velocity = direction.clone().multiply(RAZOR_SPEED);
         start.getWorld().playSound(start, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1.4f);
-        new RazorJob(owner, spawnDisplay(start), start, velocity, onMiss).begin();
+        new RazorJob(owner, spawnDisplay(start), stack, homeSlot, start, velocity, onMiss).begin();
     }
 
     // ----------------------------------------------------------------- Display
@@ -145,15 +161,43 @@ public final class HatEffects {
         display.setTransformation(new Transformation(offset, rotation, scale, new Quaternionf()));
     }
 
+    // ------------------------------------------------------------ Returning the hat
+
+    /** Back into the slot it came from if that is free, else anywhere in the inventory, else at the owner's feet. */
+    private static void giveBack(Player owner, ItemStack item, int homeSlot) {
+        PlayerInventory inventory = owner.getInventory();
+        ItemStack occupant = inventory.getItem(homeSlot);
+        if (occupant == null || occupant.isEmpty()) {
+            inventory.setItem(homeSlot, item);
+            return;
+        }
+        for (ItemStack leftover : inventory.addItem(item).values()) {
+            drop(owner.getLocation().add(0, 0.5, 0), leftover);
+        }
+    }
+
+    private static void drop(Location at, ItemStack item) {
+        at.getWorld().dropItem(at, item, (Item dropped) -> {
+            dropped.setVelocity(new Vector());
+            dropped.setInvulnerable(true);
+            dropped.setUnlimitedLifetime(true);
+        });
+    }
+
     // -------------------------------------------------------------------- Jobs
 
     private abstract class Job extends BukkitRunnable {
         final Player owner;
         final ItemDisplay display;
+        private final int homeSlot;
+        /** The real hat item while this throw is out; null once it has been handed back. */
+        private ItemStack stack;
 
-        Job(Player owner, ItemDisplay display) {
+        Job(Player owner, ItemDisplay display, ItemStack stack, int homeSlot) {
             this.owner = owner;
             this.display = display;
+            this.stack = stack;
+            this.homeSlot = homeSlot;
         }
 
         void begin() {
@@ -168,18 +212,31 @@ public final class HatEffects {
         @Override
         public void run() {
             // A display that is gone (its chunk unloaded, say) ends the job instead of ticking on a dead entity.
-            if (!display.isValid() || !step()) stop();
+            if (!display.isValid() || !step()) stop(false);
         }
 
-        void stop() {
+        /** Ends the throw and gives the hat back: to its owner, or dropped where it is if {@code dropHere} or the owner is gone. */
+        void stop(boolean dropHere) {
             try {
                 cancel();
             } catch (IllegalStateException ignored) {
                 // never scheduled
             }
+            Location at = display.getLocation();
             display.remove();
             jobs.remove(this);
             thrown.remove(owner.getUniqueId());
+
+            ItemStack item = stack;
+            stack = null;
+            if (item == null) return;
+
+            Player current = Bukkit.getPlayer(owner.getUniqueId());
+            if (dropHere || current == null || !current.isOnline() || current.isDead()) {
+                drop(at, item);
+            } else {
+                giveBack(current, item, homeSlot);
+            }
         }
     }
 
@@ -197,8 +254,8 @@ public final class HatEffects {
         private double landZ;
         private int restTicks = 0;
 
-        PadJob(Player owner, ItemDisplay display, Location start, Vector velocity) {
-            super(owner, display);
+        PadJob(Player owner, ItemDisplay display, ItemStack stack, int homeSlot, Location start, Vector velocity) {
+            super(owner, display, stack, homeSlot);
             this.world = start.getWorld();
             this.pos = start.clone();
             this.velocity = velocity;
@@ -306,8 +363,9 @@ public final class HatEffects {
         private LivingEntity victim = null;
         private int stuckTicks = 0;
 
-        RazorJob(Player owner, ItemDisplay display, Location start, Vector velocity, Runnable onMiss) {
-            super(owner, display);
+        RazorJob(Player owner, ItemDisplay display, ItemStack stack, int homeSlot, Location start, Vector velocity,
+                 Runnable onMiss) {
+            super(owner, display, stack, homeSlot);
             this.world = start.getWorld();
             this.pos = start.clone();
             this.velocity = velocity;
