@@ -81,7 +81,7 @@ public final class HatEffects {
         this.deaths = deaths;
     }
 
-    /** True while one of this player's thrown hats is still out (so it isn't also drawn on their head). */
+    /** True while one of this player's thrown hats is still out (so a second one is not thrown at the same time). */
     public boolean hasThrown(Player player) {
         return thrown.contains(player.getUniqueId());
     }
@@ -134,11 +134,6 @@ public final class HatEffects {
         });
     }
 
-    /** Spawns a hat display that is not a throw, e.g. the one drawn on a player's head. */
-    public ItemDisplay spawnStaticDisplay(Location at) {
-        return spawnDisplay(at);
-    }
-
     /**
      * Rotates and scales the hat about its own center, then places that center {@code centerAt} away from the
      * display's origin (null = on the origin). Interpolates over the next tick.
@@ -172,7 +167,8 @@ public final class HatEffects {
 
         @Override
         public void run() {
-            if (!step()) stop();
+            // A display that is gone (its chunk unloaded, say) ends the job instead of ticking on a dead entity.
+            if (!display.isValid() || !step()) stop();
         }
 
         void stop() {
@@ -255,6 +251,8 @@ public final class HatEffects {
 
         private boolean rest() {
             if (++restTicks > PAD_LIFETIME_TICKS) {
+                int now = Bukkit.getCurrentTick();
+                lastBounce.values().removeIf(tick -> now - tick > 40);
                 world.playSound(new Location(world, landX, landY, landZ), Sound.BLOCK_SLIME_BLOCK_BREAK, 1f, 1.2f);
                 world.spawnParticle(Particle.ITEM_SLIME, landX, landY + 0.2, landZ, 12, 0.3, 0.1, 0.3, 0.0);
                 return false;

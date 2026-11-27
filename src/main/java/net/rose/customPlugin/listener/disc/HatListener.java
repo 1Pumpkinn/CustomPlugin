@@ -1,0 +1,165 @@
+package net.rose.customPlugin.listener.disc;
+
+import net.kyori.adventure.bossbar.BossBar;
+import net.rose.customPlugin.effect.HatEffects;
+import net.rose.customPlugin.effect.ZeusDiscFlight;
+import net.rose.customPlugin.item.misc.Hat;
+import net.rose.customPlugin.util.CooldownBars;
+import net.rose.customPlugin.util.DeathMessages;
+import org.bukkit.GameMode;
+import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
+import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerSwapHandItemsEvent;
+import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.plugin.java.JavaPlugin;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.logging.Level;
+
+public final class HatListener implements Listener {
+
+    private static final int OFFHAND_SLOT = 40;
+    /** How fast the thrown hat flies compared to the Zeus Disc (1.0). Lower is slower. */
+    private static final double FLIGHT_SPEED_SCALE = 0.6;
+
+    private static final long PAD_COOLDOWN_MS = 20_000;
+    private static final long RAZOR_COOLDOWN_MS = 25_000;
+    private static final long RAZOR_MISS_COOLDOWN_MS = 8_000; // shorter when the razor hat hits nobody
+
+    private static final String PAD_ID = "hat_bounce";
+    private static final String RAZOR_ID = "hat_razor";
+
+    private final JavaPlugin plugin;
+    private final Hat hat;
+    private final CooldownBars cooldowns;
+    private final HatEffects effects;
+    private final DeathMessages deaths;
+    private final Map<UUID, ZeusDiscFlight> flights = new HashMap<>();
+
+    public HatListener(JavaPlugin plugin, Hat hat, CooldownBars cooldowns, HatEffects effects, DeathMessages deaths) {
+        this.plugin = plugin;
+        this.hat = hat;
+        this.cooldowns = cooldowns;
+        this.effects = effects;
+        this.deaths = deaths;
+    }
+
+    /** Offhand key (F) while holding the Hat: throw the bounce hat, or the razor hat when crouching. The swap is always cancelled. */
+    @EventHandler(ignoreCancelled = true)
+    public void onSwapHand(PlayerSwapHandItemsEvent event) {
+        Player player = event.getPlayer();
+        if (!hat.isHat(player.getInventory().getItemInMainHand())) return;
+
+        event.setCancelled(true);
+        throwHat(player);
+    }
+
+    /** Right-click throws the Hat like a disc: it damages the first thing it hits and flies back to the thrower. */
+    // Not ignoreCancelled: a click on air has no block to use, so Bukkit reports it as cancelled from the start.
+    // What matters is whether another plugin denied using the item.
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onInteract(PlayerInteractEvent event) {
+        Action action = event.getAction();
+        if (action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) return;
+        if (event.useItemInHand() == Event.Result.DENY) return;
+
+        EquipmentSlot hand = event.getHand();
+        if (hand != EquipmentSlot.HAND && hand != EquipmentSlot.OFF_HAND) return;
+        if (!hat.isHat(event.getItem())) return;
+
+        Player player = event.getPlayer();
+        // Chests, doors, buttons... still work like normal, unless the player is sneaking.
+        if (action == Action.RIGHT_CLICK_BLOCK
+                && !player.isSneaking()
+                && event.getClickedBlock() != null
+                && event.getClickedBlock().getType().isInteractable()) {
+            return;
+        }
+        event.setCancelled(true);
+        if (player.getGameMode() == GameMode.SPECTATOR) return;
+        throwDisc(player, hand);
+    }
+
+    private void throwHat(Player player) {
+        if (effects.hasThrown(player)) return; // only one hat out at a time
+        if (player.isSneaking()) {
+            throwRazor(player);
+        } else {
+            throwPad(player);
+        }
+    }
+
+    /** Takes the hat out of the player's hand and throws it; it is handed back when the flight ends. */
+    private void throwDisc(Player player, EquipmentSlot hand) {
+        UUID id = player.getUniqueId();
+        if (flights.containsKey(id) || effects.hasThrown(player)) return; // one hat out at a time
+
+        PlayerInventory inventory = player.getInventory();
+        int slot = hand == EquipmentSlot.OFF_HAND ? OFFHAND_SLOT : inventory.getHeldItemSlot();
+        ItemStack held = inventory.getItem(slot);
+        if (!hat.isHat(held)) return;
+
+        ItemStack thrown = held.clone();
+        thrown.setAmount(1);
+        inventory.setItem(slot, null);
+        try {
+            flights.put(id, ZeusDiscFlight.launch(plugin, null, deaths, flight -> flights.remove(id, flight),
+                    player, thrown, slot, false, DeathMessages.HAT, true, FLIGHT_SPEED_SCALE));
+        } catch (Throwable t) {
+            // The throw failed after the hat left the inventory: put it straight back.
+            plugin.getLogger().log(Level.SEVERE, "Could not throw the Hat", t);
+            inventory.setItem(slot, thrown);
+        }
+    }
+
+    /** Ends every flight (each hat goes back to its thrower); call from onDisable. */
+    public void shutdown() {
+        for (ZeusDiscFlight flight : new ArrayList<>(flights.values())) {
+            flight.end();
+        }
+    }
+
+    private void throwPad(Player player) {
+        if (cooldowns.isOnCooldown(player, PAD_ID)) return; // boss bar already shows the time left
+        cooldowns.start(player, PAD_ID, "Bounce Hat", BossBar.Color.GREEN, PAD_COOLDOWN_MS);
+        effects.throwPad(player);
+    }
+
+    private void throwRazor(Player player) {
+        if (cooldowns.isOnCooldown(player, RAZOR_ID)) return;
+        cooldowns.start(player, RAZOR_ID, "Razor Hat", BossBar.Color.RED, RAZOR_COOLDOWN_MS);
+        effects.throwRazor(player, () ->
+                cooldowns.start(player, RAZOR_ID, "Razor Hat", BossBar.Color.RED, RAZOR_MISS_COOLDOWN_MS));
+    }
+
+    @EventHandler
+    public void onDeath(PlayerDeathEvent event) {
+        effects.cancel(event.getEntity());
+    }
+
+    @EventHandler
+    public void onJoin(PlayerJoinEvent event) {
+        cooldowns.resume(event.getPlayer());
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onQuit(PlayerQuitEvent event) {
+        ZeusDiscFlight flight = flights.get(event.getPlayer().getUniqueId());
+        if (flight != null) flight.end(); // a hat in the air would be lost if the player left
+        effects.cancel(event.getPlayer());
+        cooldowns.hideAll(event.getPlayer());
+    }
+}

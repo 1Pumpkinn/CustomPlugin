@@ -88,17 +88,46 @@ public final class CooldownBars {
 
     /** Hides all of the player's bars (e.g. on quit) but keeps the cooldowns running. Primed bars are dropped. */
     public void hideAll(Player player) {
-        Map<String, BossBar> primedBars = primed.remove(player.getUniqueId());
+        UUID id = player.getUniqueId();
+        Map<String, BossBar> primedBars = primed.remove(id);
         if (primedBars != null) {
             for (BossBar bar : primedBars.values()) {
                 player.hideBossBar(bar);
             }
         }
-        Map<String, Cooldown> perPlayer = cooldowns.get(player.getUniqueId());
+        Map<String, Cooldown> perPlayer = cooldowns.get(id);
         if (perPlayer == null) return;
-        for (Cooldown cooldown : perPlayer.values()) {
+
+        long now = System.currentTimeMillis();
+        long latestEnd = now;
+        Iterator<Cooldown> it = perPlayer.values().iterator();
+        while (it.hasNext()) {
+            Cooldown cooldown = it.next();
             hide(player, cooldown);
+            if (cooldown.endsAt <= now) {
+                it.remove();
+            } else {
+                latestEnd = Math.max(latestEnd, cooldown.endsAt);
+            }
         }
+
+        if (perPlayer.isEmpty()) {
+            cooldowns.remove(id);
+        } else if (plugin.isEnabled()) {
+            // Running cooldowns survive a relog, but a player who never comes back must not keep them forever.
+            long delayTicks = (latestEnd - now) / 50L + 2L;
+            plugin.getServer().getScheduler().runTaskLater(plugin, () -> forgetExpired(id), delayTicks);
+        }
+    }
+
+    /** Drops the finished cooldowns of a player who is still offline. */
+    private void forgetExpired(UUID id) {
+        if (Bukkit.getPlayer(id) != null) return;
+        Map<String, Cooldown> perPlayer = cooldowns.get(id);
+        if (perPlayer == null) return;
+        long now = System.currentTimeMillis();
+        perPlayer.values().removeIf(cooldown -> cooldown.endsAt <= now);
+        if (perPlayer.isEmpty()) cooldowns.remove(id);
     }
 
     /** Re-shows bars for any cooldowns that are still running (e.g. on join). */

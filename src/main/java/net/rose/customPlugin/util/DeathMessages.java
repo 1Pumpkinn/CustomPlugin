@@ -41,6 +41,8 @@ public final class DeathMessages implements Listener {
     public static final String HAT = "hat";
 
     private static final long MARK_WINDOW_MS = 1_000;
+    /** Above this many pending marks, the ones whose victim survived are swept out. */
+    private static final int MARK_PRUNE_SIZE = 64;
 
     private static final MiniMessage MINI = MiniMessage.miniMessage();
 
@@ -95,7 +97,11 @@ public final class DeathMessages implements Listener {
     /** Call right before dealing ability damage to {@code victim}. Only players have death messages, so mobs are ignored. */
     public void mark(LivingEntity victim, Player killer, String weapon) {
         if (!(victim instanceof Player)) return;
-        marks.put(victim.getUniqueId(), new Mark(killer.getUniqueId(), weapon, System.currentTimeMillis()));
+        long now = System.currentTimeMillis();
+        if (marks.size() > MARK_PRUNE_SIZE) {
+            marks.values().removeIf(mark -> now - mark.at() > MARK_WINDOW_MS);
+        }
+        marks.put(victim.getUniqueId(), new Mark(killer.getUniqueId(), weapon, now));
     }
 
     @EventHandler(priority = EventPriority.HIGH)

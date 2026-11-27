@@ -33,7 +33,9 @@ public final class EgapListener implements Listener {
         if (event.getItem().getType() != Material.ENCHANTED_GOLDEN_APPLE) return;
 
         Player player = event.getPlayer();
-        endsAt.put(player.getUniqueId(), System.currentTimeMillis() + EGAP_COOLDOWN_MS);
+        long now = System.currentTimeMillis();
+        endsAt.values().removeIf(end -> end <= now); // players who left without coming back
+        endsAt.put(player.getUniqueId(), now + EGAP_COOLDOWN_MS);
         // Vanilla cooldown greys out the apples and stops the player from starting to eat one.
         player.setCooldown(Material.ENCHANTED_GOLDEN_APPLE, (int) (EGAP_COOLDOWN_MS / 50));
     }

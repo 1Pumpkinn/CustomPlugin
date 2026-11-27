@@ -40,7 +40,8 @@ public final class FrostEffects {
     private final JavaPlugin plugin;
     private final DeathMessages deaths;
     private final Map<UUID, BukkitTask> freezing = new HashMap<>();
-    private final Map<UUID, Long> stunnedUntil = new HashMap<>();
+    /** Game tick (see {@link Bukkit#getCurrentTick()}) at which each stun ends. */
+    private final Map<UUID, Integer> stunnedUntil = new HashMap<>();
     private final Set<UUID> harmlessFreeze = new HashSet<>();
 
     /** True while our own freeze damage is being dealt, so listeners can tell it apart from a real stab. */
@@ -64,21 +65,22 @@ public final class FrostEffects {
     // ------------------------------------------------------------------ Stun
 
     public void stun(LivingEntity victim, int ticks) {
-        stunnedUntil.put(victim.getUniqueId(), System.currentTimeMillis() + ticks * 50L);
+        stunnedUntil.put(victim.getUniqueId(), Bukkit.getCurrentTick() + ticks);
         if (victim instanceof Mob mob) {
             // No AI: it can't walk, target or attack. Gravity and knockback still work.
             mob.setAware(false);
             plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
                 // A newer stun may have extended it; only the last one switches the AI back on.
-                if (mob.isValid() && !isStunned(mob)) mob.setAware(true);
+                // isStunned goes first: it also drops the expired entry, even for a mob that has since died.
+                if (!isStunned(mob) && mob.isValid()) mob.setAware(true);
             }, ticks + 1L);
         }
     }
 
     public boolean isStunned(LivingEntity player) {
-        Long until = stunnedUntil.get(player.getUniqueId());
+        Integer until = stunnedUntil.get(player.getUniqueId());
         if (until == null) return false;
-        if (until <= System.currentTimeMillis()) {
+        if (until <= Bukkit.getCurrentTick()) {
             stunnedUntil.remove(player.getUniqueId());
             return false;
         }

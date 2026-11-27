@@ -35,6 +35,11 @@ public final class TempestTridentListener implements Listener {
     private static final long THROW_COOLDOWN_MS = 30_000;
     private static final String THROW_ID = "tempest_throw";
     private static final String LABEL = "Tempest";
+    /** A trident that never reports a hit (void, despawn, unloaded chunk) is forgotten after this long. */
+    private static final long EMPOWERED_TIMEOUT_MS = 5 * 60_000L;
+
+    private record Empowered(UUID thrower, long at) {
+    }
 
     private final JavaPlugin plugin;
     private final TempestTrident trident;
@@ -42,8 +47,8 @@ public final class TempestTridentListener implements Listener {
     private final TempestSpinEffect spin;
 
     private final Set<UUID> armed = new HashSet<>();
-    /** Tridents in flight that carry the ability: trident entity id -> thrower id. */
-    private final Map<UUID, UUID> empowered = new HashMap<>();
+    /** Tridents in flight that carry the ability: trident entity id -> who threw it. */
+    private final Map<UUID, Empowered> empowered = new HashMap<>();
 
     public TempestTridentListener(JavaPlugin plugin, TempestTrident trident, CooldownBars cooldowns,
                                   TempestSpinEffect spin) {
@@ -77,17 +82,19 @@ public final class TempestTridentListener implements Listener {
 
         cooldowns.unprime(player, THROW_ID);
         cooldowns.start(player, THROW_ID, LABEL, BossBar.Color.BLUE, THROW_COOLDOWN_MS);
-        empowered.put(thrown.getUniqueId(), player.getUniqueId());
+        long now = System.currentTimeMillis();
+        empowered.values().removeIf(entry -> now - entry.at() > EMPOWERED_TIMEOUT_MS);
+        empowered.put(thrown.getUniqueId(), new Empowered(player.getUniqueId(), now));
     }
 
     /** Hitting a player or mob starts the spin and hands the trident back; a miss just uses up the charge. */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onHit(ProjectileHitEvent event) {
         if (!(event.getEntity() instanceof Trident thrown)) return;
-        UUID throwerId = empowered.remove(thrown.getUniqueId());
-        if (throwerId == null) return;
+        Empowered entry = empowered.remove(thrown.getUniqueId());
+        if (entry == null) return;
 
-        Player thrower = plugin.getServer().getPlayer(throwerId);
+        Player thrower = plugin.getServer().getPlayer(entry.thrower());
         Entity hit = event.getHitEntity();
         if (thrower == null || !(hit instanceof LivingEntity victim) || !Targets.isValidTarget(thrower, victim)) return;
 

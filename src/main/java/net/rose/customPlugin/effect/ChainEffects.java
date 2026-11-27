@@ -27,8 +27,10 @@ import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -50,6 +52,7 @@ public final class ChainEffects {
     private final JavaPlugin plugin;
     private final NamespacedKey jumpLockKey;
     private final Map<UUID, Bind> binds = new HashMap<>();
+    private final Set<Link> links = new HashSet<>();
 
     public ChainEffects(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -63,7 +66,9 @@ public final class ChainEffects {
 
     /** A chain stretched between two moving points (used for the pull). Call {@link Link#remove()} when done. */
     public Link createLink() {
-        return new Link();
+        Link link = new Link();
+        links.add(link);
+        return link;
     }
 
     /** Slows the target for 5s and stops them jumping or using wind charges for a few seconds. */
@@ -71,7 +76,7 @@ public final class ChainEffects {
         if (!Targets.isValidTarget(caster, target)) return;
         release(target);
 
-        Bind bind = new Bind(caster);
+        Bind bind = new Bind();
         binds.put(target.getUniqueId(), bind);
 
         target.addPotionEffect(new PotionEffect(
@@ -102,6 +107,7 @@ public final class ChainEffects {
 
     /** Frees everyone; call from onDisable. */
     public void shutdown() {
+        for (Link link : new ArrayList<>(links)) link.remove();
         for (UUID id : new ArrayList<>(binds.keySet())) {
             if (Bukkit.getEntity(id) instanceof LivingEntity living) release(living);
         }
@@ -169,7 +175,7 @@ public final class ChainEffects {
     }
 
     /** Chain blocks laid end to end between two points, reused and restretched on every update. */
-    public static final class Link {
+    public final class Link {
         private final List<BlockDisplay> segments = new ArrayList<>();
 
         private Link() {
@@ -202,15 +208,11 @@ public final class ChainEffects {
                 display.remove();
             }
             segments.clear();
+            links.remove(this);
         }
     }
 
     private static final class Bind {
-        private final Player caster;
         private BukkitTask task;
-
-        private Bind(Player caster) {
-            this.caster = caster;
-        }
     }
 }

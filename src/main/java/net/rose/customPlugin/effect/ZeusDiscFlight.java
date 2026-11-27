@@ -95,6 +95,9 @@ public final class ZeusDiscFlight {
     /** The remaining route has to shrink by at least this much (blocks) to count as progress. */
     private static final double PROGRESS_EPSILON = 0.25;
 
+    /** Size of the hat model while it flies (1.0 = as big as the one worn on the head). */
+    private static final float UPRIGHT_SCALE = 1.0f;
+
     private static final float SPIN_RADIANS_PER_TICK = (float) Math.toRadians(70.0);
     private static final double MAX_FLIGHT_PITCH = 75.0;
     /** The sprite is 14 of its 16 pixels wide, so scale it up until the disc is {@link #WIDTH}. */
@@ -107,8 +110,14 @@ public final class ZeusDiscFlight {
                     Material.HONEY_BLOCK);
 
     private final JavaPlugin plugin;
+    /** Null for a disc without lightning (the Hat). */
     private final ZeusLightning lightning;
     private final DeathMessages deaths;
+    private final String deathKey;
+    /** A 3D model that stays level and just spins on the spot (the Hat), instead of a flat sprite tilted along its flight. */
+    private final boolean upright;
+    /** Multiplies every speed of the flight: 1.0 is the Zeus Disc, lower is slower. */
+    private final double speedScale;
     private final Consumer<ZeusDiscFlight> onEnd;
     private final UUID ownerId;
     private final World world;
@@ -153,10 +162,16 @@ public final class ZeusDiscFlight {
             Player owner,
             ItemStack stack,
             int homeSlot,
-            boolean primed) {
+            boolean primed,
+            String deathKey,
+            boolean upright,
+            double speedScale) {
         this.plugin = plugin;
         this.lightning = lightning;
         this.deaths = deaths;
+        this.deathKey = deathKey;
+        this.upright = upright;
+        this.speedScale = speedScale;
         this.onEnd = onEnd;
         this.ownerId = owner.getUniqueId();
         this.stack = stack;
@@ -173,9 +188,19 @@ public final class ZeusDiscFlight {
             Player owner,
             ItemStack stack,
             int homeSlot,
-            boolean primed) {
-        ZeusDiscFlight disc = new ZeusDiscFlight(plugin, lightning, deaths, onEnd, owner, stack, homeSlot, primed);
-        disc.start(owner);
+            boolean primed,
+            String deathKey,
+            boolean upright,
+            double speedScale) {
+        ZeusDiscFlight disc = new ZeusDiscFlight(
+                plugin, lightning, deaths, onEnd, owner, stack, homeSlot, primed, deathKey, upright, speedScale);
+        try {
+            disc.start(owner);
+        } catch (Throwable t) {
+            // The caller puts the item back; the display it never got to track must not stay in the world.
+            if (disc.display != null && disc.display.isValid()) disc.display.remove();
+            throw t;
+        }
         return disc;
     }
 
@@ -195,7 +220,7 @@ public final class ZeusDiscFlight {
         }
 
         this.pos = start;
-        this.velocity = look.clone().multiply(THROW_SPEED);
+        this.velocity = look.clone().multiply(THROW_SPEED * speedScale);
         this.flightDir = look.clone();
 
         int smoothing = Math.max(2, Math.min(5, owner.getPing() / 50));
@@ -301,8 +326,9 @@ public final class ZeusDiscFlight {
         Vector reflected =
                 velocity.clone().subtract(normal.clone().multiply(2.0 * velocity.dot(normal)));
         reflected.multiply(BOUNCE_SPEED_RETAIN);
-        if (reflected.length() < MIN_BOUNCE_SPEED) {
-            reflected = reflected.normalize().multiply(MIN_BOUNCE_SPEED);
+        double minBounce = MIN_BOUNCE_SPEED * speedScale;
+        if (reflected.length() < minBounce) {
+            reflected = reflected.normalize().multiply(minBounce);
         }
         velocity = reflected;
         moveTo(pos.clone().add(normal.multiply(0.1)));
@@ -399,7 +425,7 @@ public final class ZeusDiscFlight {
         Vector toAim = aim.clone().subtract(from);
         double aimDistance = toAim.length();
         Vector desired =
-                aimDistance < 1.0E-4 ? new Vector() : toAim.clone().multiply(RETURN_SPEED / aimDistance);
+                aimDistance < 1.0E-4 ? new Vector() : toAim.clone().multiply(RETURN_SPEED * speedScale / aimDistance);
         Vector steer = heading.clone().add(desired.clone().subtract(heading).multiply(RETURN_TURN_RATE));
         Vector move = (aim == target && steer.length() >= aimDistance) ? toAim : steer;
 
@@ -516,7 +542,7 @@ public final class ZeusDiscFlight {
         hitSomeone = true;
         lastHitTick.put(target.getUniqueId(), age);
         double before = target.getHealth();
-        deaths.mark(target, owner, DeathMessages.ZEUS_DISC);
+        deaths.mark(target, owner, deathKey);
         TrueDamage.of(DISC_DAMAGE).attacker(owner).type(org.bukkit.damage.DamageType.PLAYER_ATTACK).apply(target);
         boolean landed = target.isDead() || target.getHealth() < before;
         if (landed) applyKnockback(target);
@@ -526,6 +552,7 @@ public final class ZeusDiscFlight {
         // The lightning does not depend on the disc's own damage getting through (armor, absorption hearts
         // and invincibility frames can swallow it): every time the disc hits something, it procs.
         // Passive: chain lightning to nearby players.
+        if (lightning == null) return;
         lightning.chain(owner, target);
         // Primed throw: everything the disc hits is struck by lightning (once per throw).
         if (primed && struck.add(target.getUniqueId())) {
@@ -560,6 +587,13 @@ public final class ZeusDiscFlight {
     }
 
     private void updateDisplay() {
+        if (upright) {
+            // Level and spinning about its own centre. It never tilts or turns to face where it is going, so a
+            // bounce or the turn for home is just a change of direction.
+            HatEffects.pose(display, new Quaternionf().rotationY(spin), new Vector3f(UPRIGHT_SCALE), null);
+            display.teleport(location(pos));
+            return;
+        }
         Quaternionf left = new Quaternionf();
         double horizontal = Math.hypot(flightDir.getX(), flightDir.getZ());
         if (horizontal > 1.0E-3) {

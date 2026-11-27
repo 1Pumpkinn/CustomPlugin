@@ -2,7 +2,6 @@ package net.rose.customPlugin;
 
 import net.rose.customPlugin.command.WeaponCommand;
 import net.rose.customPlugin.effect.HatEffects;
-import net.rose.customPlugin.effect.HatHeadDisplay;
 import net.rose.customPlugin.effect.SoulFreezeEffect;
 import net.rose.customPlugin.effect.TempestSpinEffect;
 import net.rose.customPlugin.effect.AxeSpinEffect;
@@ -27,7 +26,7 @@ import net.rose.customPlugin.listener.axe.VolcanicAxeListener;
 import net.rose.customPlugin.listener.bow.TricksterBowListener;
 import net.rose.customPlugin.listener.disc.ZeusDiscListener;
 import net.rose.customPlugin.listener.mace.MetalicMaceListener;
-import net.rose.customPlugin.listener.misc.HatListener;
+import net.rose.customPlugin.listener.disc.HatListener;
 import net.rose.customPlugin.listener.misc.StunListener;
 import net.rose.customPlugin.listener.player.*;
 import net.rose.customPlugin.listener.scythe.BloodthirstScytheListener;
@@ -66,7 +65,7 @@ public final class CustomPlugin extends JavaPlugin {
     private TempestSpinEffect tempestSpin;
     private Hat hat;
     private HatEffects hatEffects;
-    private HatHeadDisplay hatHead;
+    private HatListener hatListener;
     private DeathMessages deathMessages;
 
     @Override
@@ -92,7 +91,6 @@ public final class CustomPlugin extends JavaPlugin {
         this.tempestSpin = new TempestSpinEffect(this, deathMessages);
         this.hat = new Hat(this);
         this.hatEffects = new HatEffects(this, hat, deathMessages);
-        this.hatHead = new HatHeadDisplay(this, hat, hatEffects);
 
         getServer().getPluginManager().registerEvents(new KillTokenListener(killToken), this);
         getServer().getPluginManager().registerEvents(deathMessages, this);
@@ -119,8 +117,8 @@ public final class CustomPlugin extends JavaPlugin {
                 new BloodthirstScytheListener(bloodthirstScythe, cooldownBars, frostEffects, new SoulFreezeEffect(this)), this);
         getServer().getPluginManager().registerEvents(
                 new TempestTridentListener(this, tempestTrident, cooldownBars, tempestSpin), this);
-        getServer().getPluginManager().registerEvents(new HatListener(hat, cooldownBars, hatEffects), this);
-        hatHead.start();
+        this.hatListener = new HatListener(this, hat, cooldownBars, hatEffects, deathMessages);
+        getServer().getPluginManager().registerEvents(hatListener, this);
 
         saveDefaultConfig();
         // The pack is bundled in this jar and served by a built-in HTTP server (see resource-pack in config.yml).
@@ -145,12 +143,12 @@ public final class CustomPlugin extends JavaPlugin {
     public void onDisable() {
         if (packManager != null) packManager.stop();
         if (zeusDiscListener != null) zeusDiscListener.shutdown();
+        if (hatListener != null) hatListener.shutdown();
         if (cooldownBars != null) cooldownBars.shutdown();
         if (eruptionEffect != null) eruptionEffect.removeAll();
         if (axeSpinEffect != null) axeSpinEffect.removeAll();
         if (petalEffect != null) petalEffect.removeAll();
         if (tempestSpin != null) tempestSpin.removeAll();
-        if (hatHead != null) hatHead.stop();
         if (hatEffects != null) hatEffects.removeAll();
         if (frostEffects != null) frostEffects.shutdown();
         if (chainEffects != null) chainEffects.shutdown();

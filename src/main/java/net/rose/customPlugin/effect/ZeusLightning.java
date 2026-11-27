@@ -78,6 +78,7 @@ public final class ZeusLightning {
 
         List<LivingEntity> next = new ArrayList<>();
         for (LivingEntity from : frontier) {
+            if (reached.size() > CHAIN_MAX_TARGETS) break;
             Location centre = from.getLocation();
             for (LivingEntity candidate : centre.getWorld().getNearbyLivingEntities(centre, CHAIN_RANGE)) {
                 if (reached.size() > CHAIN_MAX_TARGETS) break;
@@ -93,7 +94,7 @@ public final class ZeusLightning {
             }
         }
 
-        if (next.isEmpty()) return;
+        if (next.isEmpty() || reached.size() > CHAIN_MAX_TARGETS) return;
         plugin.getServer().getScheduler().runTaskLater(plugin,
                 () -> wave(owner, next, reached, wavesLeft - 1), CHAIN_WAVE_DELAY_TICKS);
     }

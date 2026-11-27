@@ -144,7 +144,7 @@ public final class ZeusDiscListener implements Listener {
         inventory.setItem(slot, null);
         try {
             flights.put(id, ZeusDiscFlight.launch(plugin, lightning, deaths, flight -> flights.remove(id, flight),
-                    player, thrown, slot, primed));
+                    player, thrown, slot, primed, DeathMessages.ZEUS_DISC, false, 1.0));
         } catch (Throwable t) {
             // The throw failed after the disc left the inventory: put it straight back.
             plugin.getLogger().log(Level.SEVERE, "Could not throw the Zeus Disc", t);
