@@ -56,6 +56,8 @@ public final class HatEffects {
     private static final double BOUNCE_MIN = 1.6;          // launch velocity, blocks/tick
     private static final double BOUNCE_MAX = 1.6;
     private static final int BOUNCE_COOLDOWN_TICKS = 10;
+    /** After a bounce, the fall that ends it (however long the flight) does no damage for this long. */
+    private static final int BOUNCE_NO_FALL_TICKS = 200;
 
     // --- Razor hat ---
     private static final double RAZOR_SPEED = 1.3;
@@ -77,6 +79,8 @@ public final class HatEffects {
     private final Set<Job> jobs = new HashSet<>();
     private final Set<UUID> thrown = new HashSet<>();
     private final Map<UUID, Integer> lastBounce = new HashMap<>();
+    /** Game tick until which a bounced entity's next fall damage is cancelled. */
+    private final Map<UUID, Integer> noFallUntil = new HashMap<>();
 
     public HatEffects(JavaPlugin plugin, Hat hat, DeathMessages deaths) {
         this.plugin = plugin;
@@ -107,6 +111,13 @@ public final class HatEffects {
     public void removeAll() {
         for (Job job : new ArrayList<>(jobs)) job.stop(false);
         lastBounce.clear();
+        noFallUntil.clear();
+    }
+
+    /** True (once) if this entity was bounced by a hat recently: the fall damage it is about to take should be cancelled. */
+    public boolean consumeFallImmunity(LivingEntity entity) {
+        Integer until = noFallUntil.remove(entity.getUniqueId());
+        return until != null && Bukkit.getCurrentTick() <= until;
     }
 
     // ------------------------------------------------------------------ Throws
@@ -323,6 +334,7 @@ public final class HatEffects {
         private void bounceEntities() {
             int now = Bukkit.getCurrentTick();
             lastBounce.values().removeIf(tick -> now - tick > 40);
+            noFallUntil.values().removeIf(tick -> tick < now);
 
             BoundingBox zone = new BoundingBox(
                     landX - PAD_HALF_WIDTH, landY - 0.1, landZ - PAD_HALF_WIDTH,
@@ -343,6 +355,7 @@ public final class HatEffects {
                 velocity.setY(strength);
                 living.setVelocity(velocity);
                 living.setFallDistance(0f);
+                noFallUntil.put(living.getUniqueId(), now + BOUNCE_NO_FALL_TICKS);
 
                 Location feet = living.getLocation();
                 world.playSound(feet, Sound.ENTITY_SLIME_JUMP, 1f, 1.1f);

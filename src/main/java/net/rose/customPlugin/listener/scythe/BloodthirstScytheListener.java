@@ -3,8 +3,7 @@ package net.rose.customPlugin.listener.scythe;
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.rose.customPlugin.effect.FrostEffects;
-import net.rose.customPlugin.effect.SoulFreezeEffect;
+import net.rose.customPlugin.effect.VampireSweepEffect;
 import net.rose.customPlugin.item.scythe.BloodthirstScythe;
 import net.rose.customPlugin.util.CooldownBars;
 import net.rose.customPlugin.util.Targets;
@@ -17,7 +16,6 @@ import org.bukkit.Sound;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.block.data.BlockData;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -33,16 +31,14 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 /**
- * Bloodthirst Scythe: every melee hit stores a little health, offhand freezes nearby enemies, and
+ * Bloodthirst Scythe: every melee hit stores a little health, offhand is a vampire sweep that steals health, and
  * crouch + offhand spends everything stored to heal the wielder. Stored health is kept in HP (2 HP = 1 heart).
  */
 public final class BloodthirstScytheListener implements Listener {
@@ -51,12 +47,14 @@ public final class BloodthirstScytheListener implements Listener {
     private static final double HP_PER_HIT = 0.6;           // 0.3 hearts
     private static final double MAX_STORED_HP = 8.0;        // 4 hearts
 
-    // --- Offhand: soul freeze ---
-    private static final long FREEZE_COOLDOWN_MS = 30_000;
-    private static final double FREEZE_RADIUS = 5.0;
-    private static final int FREEZE_TICKS = 50;             // 2.5s
+    // --- Offhand: vampire sweep ---
+    private static final long SWEEP_COOLDOWN_MS = 30_000;
 
-    private static final String FREEZE_ID = "bloodthirst_freeze";
+    // --- Crouch + offhand: spend the stored hearts ---
+    private static final long HEAL_COOLDOWN_MS = 30_000;
+
+    private static final String SWEEP_ID = "bloodthirst_sweep";
+    private static final String HEAL_ID = "bloodthirst_heal";
     private static final String STORE_ID = "bloodthirst_store";
 
     private static final BlockData BLOOD_BLOCK = Material.REDSTONE_BLOCK.createBlockData();
@@ -64,23 +62,20 @@ public final class BloodthirstScytheListener implements Listener {
 
     private final BloodthirstScythe scythe;
     private final CooldownBars cooldowns;
-    private final FrostEffects frost;
-    private final SoulFreezeEffect soulFreeze;
+    private final VampireSweepEffect sweep;
 
     private final Map<UUID, Double> stored = new HashMap<>();
     private final Set<UUID> barShown = new HashSet<>();
 
-    public BloodthirstScytheListener(BloodthirstScythe scythe, CooldownBars cooldowns, FrostEffects frost,
-                                     SoulFreezeEffect soulFreeze) {
+    public BloodthirstScytheListener(BloodthirstScythe scythe, CooldownBars cooldowns, VampireSweepEffect sweep) {
         this.scythe = scythe;
         this.cooldowns = cooldowns;
-        this.frost = frost;
-        this.soulFreeze = soulFreeze;
+        this.sweep = sweep;
     }
 
     // ------------------------------------------------------------------ Passive
 
-    /** Melee hits with the scythe store health. Only real melee counts, so sweeps and ability damage don't. */
+    /** Melee hits with the scythe store health, unless the heal is on cooldown. Only real melee counts, so sweeps and ability damage don't. */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onHit(EntityDamageByEntityEvent event) {
         if (event.getCause() != EntityDamageEvent.DamageCause.ENTITY_ATTACK) return;
@@ -88,6 +83,7 @@ public final class BloodthirstScytheListener implements Listener {
         if (TrueDamage.isTrueDamage(event.getEntity())) return; // ability damage is not a melee hit
         if (!Targets.isValidTarget(attacker, event.getEntity())) return;
         if (!scythe.isBloodthirstScythe(attacker.getInventory().getItemInMainHand())) return;
+        if (cooldowns.isOnCooldown(attacker, HEAL_ID)) return; // no new blood while the heal is on cooldown
 
         LivingEntity victim = (LivingEntity) event.getEntity();
         victim.getWorld().spawnParticle(Particle.BLOCK, victim.getLocation().add(0, 1.0, 0),
@@ -102,7 +98,7 @@ public final class BloodthirstScytheListener implements Listener {
 
     // ------------------------------------------------------------------ Offhand
 
-    /** Offhand key (F) while holding the scythe: freeze, or heal when crouching. The swap itself is always cancelled. */
+    /** Offhand key (F) while holding the scythe: vampire sweep, or heal when crouching. The swap itself is always cancelled. */
     @EventHandler(ignoreCancelled = true)
     public void onSwapHand(PlayerSwapHandItemsEvent event) {
         Player player = event.getPlayer();
@@ -112,28 +108,19 @@ public final class BloodthirstScytheListener implements Listener {
         if (player.isSneaking()) {
             consumeHearts(player);
         } else {
-            soulFreeze(player);
+            vampireSweep(player);
         }
     }
 
-    private void soulFreeze(Player player) {
-        if (cooldowns.isOnCooldown(player, FREEZE_ID)) return; // boss bar already shows the time left
+    private void vampireSweep(Player player) {
+        if (cooldowns.isOnCooldown(player, SWEEP_ID)) return; // boss bar already shows the time left
+        if (!sweep.cast(player)) return; // nobody in the arc, so no cooldown spent
 
-        List<LivingEntity> targets = new ArrayList<>();
-        for (Entity entity : player.getNearbyEntities(FREEZE_RADIUS, FREEZE_RADIUS, FREEZE_RADIUS)) {
-            if (Targets.isValidTarget(player, entity)) targets.add((LivingEntity) entity);
-        }
-        if (targets.isEmpty()) return; // nothing to freeze, so no cooldown spent
-
-        cooldowns.start(player, FREEZE_ID, "Soul Freeze", BossBar.Color.RED, FREEZE_COOLDOWN_MS);
-
-        for (LivingEntity victim : targets) {
-            frost.stun(victim, FREEZE_TICKS);
-            soulFreeze.playFrozen(victim, FREEZE_TICKS);
-        }
+        cooldowns.start(player, SWEEP_ID, "Vampire Sweep", BossBar.Color.RED, SWEEP_COOLDOWN_MS);
     }
 
     private void consumeHearts(Player player) {
+        if (cooldowns.isOnCooldown(player, HEAL_ID)) return;
         double hp = stored.getOrDefault(player.getUniqueId(), 0.0);
         if (hp <= 0) return;
 
@@ -145,6 +132,7 @@ public final class BloodthirstScytheListener implements Listener {
         refreshBar(player);
 
         player.heal(hp, EntityRegainHealthEvent.RegainReason.CUSTOM);
+        cooldowns.start(player, HEAL_ID, "Blood Spend", BossBar.Color.RED, HEAL_COOLDOWN_MS);
 
         Location at = player.getLocation().add(0, 1.0, 0);
         player.getWorld().spawnParticle(Particle.HEART, at, 8, 0.4, 0.5, 0.4, 0.0);

@@ -4,6 +4,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
+import net.rose.customPlugin.util.MaxEnchants;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
@@ -32,13 +33,14 @@ public final class BloodthirstScythe {
                 .decoration(TextDecoration.ITALIC, false));
         meta.lore(List.of(
                 ability("Hit", "Store 0.3 hearts per hit (max 4)"),
-                ability("Offhand", "Freeze nearby enemies in place"),
-                ability("Crouch + Offhand", "Spend every stored heart to heal yourself")
+                ability("Offhand", "Vampire sweep: slash the arc in front of you for 2.5 hearts of true damage and steal it back as health"),
+                ability("Crouch + Offhand", "Spend every stored heart to heal yourself (30s cooldown, no blood is stored while it recharges)")
         ));
 
         meta.setItemModel(key); // texture pack model: customplugin:<name>
         meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
         item.setItemMeta(meta);
+        MaxEnchants.apply(item); // weapons always come fully enchanted
         return item;
     }
 

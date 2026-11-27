@@ -3,7 +3,7 @@ package net.rose.customPlugin.effect;
 import net.rose.customPlugin.util.DeathMessages;
 import net.rose.customPlugin.util.DiscPathfinder;
 import net.rose.customPlugin.util.Targets;
-import net.rose.customPlugin.util.TrueDamage;
+import net.rose.customPlugin.util.ShieldBlocking;
 import org.bukkit.Bukkit;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
@@ -16,6 +16,8 @@ import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.block.BlockFace;
+import org.bukkit.damage.DamageSource;
+import org.bukkit.damage.DamageType;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Item;
@@ -541,9 +543,16 @@ public final class ZeusDiscFlight {
     private void damage(Player owner, LivingEntity target) {
         hitSomeone = true;
         lastHitTick.put(target.getUniqueId(), age);
+        if (target instanceof Player player && ShieldBlocking.tryBlock(player, shieldDirection(target), DISC_DAMAGE)) {
+            if (!returning) beginReturn(); // the shield stops the disc: no damage, no lightning
+            return;
+        }
         double before = target.getHealth();
         deaths.mark(target, owner, deathKey);
-        TrueDamage.of(DISC_DAMAGE).attacker(owner).type(org.bukkit.damage.DamageType.PLAYER_ATTACK).apply(target);
+        // A normal hit, not an ability: armor, enchantments, resistance and i-frames all apply to it.
+        DamageSource source = DamageSource.builder(DamageType.PLAYER_ATTACK)
+                .withCausingEntity(owner).withDirectEntity(owner).build();
+        target.damage(DISC_DAMAGE, source);
         boolean landed = target.isDead() || target.getHealth() < before;
         if (landed) applyKnockback(target);
         world.playSound(
@@ -558,6 +567,12 @@ public final class ZeusDiscFlight {
         if (primed && struck.add(target.getUniqueId())) {
             lightning.strike(owner, target);
         }
+    }
+
+    /** The way the disc is moving, for the shield's front-arc check. */
+    private Vector shieldDirection(LivingEntity target) {
+        if (velocity.lengthSquared() > 1.0E-6) return velocity.clone().normalize();
+        return target.getLocation().toVector().subtract(pos);
     }
 
     /** Pushes the target along the disc's horizontal flight direction, like a vanilla knockback hit. */

@@ -2,7 +2,7 @@ package net.rose.customPlugin;
 
 import net.rose.customPlugin.command.WeaponCommand;
 import net.rose.customPlugin.effect.HatEffects;
-import net.rose.customPlugin.effect.SoulFreezeEffect;
+import net.rose.customPlugin.effect.VampireSweepEffect;
 import net.rose.customPlugin.effect.TempestSpinEffect;
 import net.rose.customPlugin.effect.AxeSpinEffect;
 import net.rose.customPlugin.effect.ChainEffects;
@@ -114,7 +114,7 @@ public final class CustomPlugin extends JavaPlugin {
 
         getServer().getPluginManager().registerEvents(new PetalBladeListener(petalBlade, cooldownBars, petalEffect), this);
         getServer().getPluginManager().registerEvents(
-                new BloodthirstScytheListener(bloodthirstScythe, cooldownBars, frostEffects, new SoulFreezeEffect(this)), this);
+                new BloodthirstScytheListener(bloodthirstScythe, cooldownBars, new VampireSweepEffect(deathMessages)), this);
         getServer().getPluginManager().registerEvents(
                 new TempestTridentListener(this, tempestTrident, cooldownBars, tempestSpin), this);
         this.hatListener = new HatListener(this, hat, cooldownBars, hatEffects, deathMessages);

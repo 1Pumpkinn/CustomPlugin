@@ -3,6 +3,7 @@ package net.rose.customPlugin.item.spear;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
+import net.rose.customPlugin.util.MaxEnchants;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
@@ -32,6 +33,7 @@ public final class FrostSpear {
         meta.setItemModel(key); // texture pack model: customplugin:<name>
         meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
         item.setItemMeta(meta);
+        MaxEnchants.apply(item); // weapons always come fully enchanted
         return item;
     }
 

@@ -12,6 +12,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageEvent.DamageModifier;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.util.Vector;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -63,7 +64,8 @@ public final class TrueDamage implements Listener {
         private Entity attacker = null;
         private DamageType type = DamageType.GENERIC;
         private boolean ignoreIFrames = true;
-        private boolean bypassAbsorption = false;
+        private boolean bypassAbsorption = true;
+        private Vector shieldDirection = null;
 
         private Builder(double amount) {
             this.amount = amount;
@@ -86,9 +88,19 @@ public final class TrueDamage implements Listener {
             return this;
         }
 
-        /** If true, absorption hearts are skipped and the damage hits real health. Default false. */
+        /** If true (default) absorption hearts are skipped and the damage hits real health, like everything else true damage ignores. */
         public Builder bypassAbsorption(boolean bypass) {
             this.bypassAbsorption = bypass;
+            return this;
+        }
+
+        /**
+         * Marks this as a projectile-style hit that a raised shield can stop. {@code travelDirection} is the way
+         * the attack is moving (attacker to victim). If the victim blocks it nothing is dealt and
+         * {@link #apply} returns false, so callers should skip their on-hit effects then.
+         */
+        public Builder blockableByShield(Vector travelDirection) {
+            this.shieldDirection = travelDirection;
             return this;
         }
 
@@ -105,6 +117,12 @@ public final class TrueDamage implements Listener {
 
             UUID id = target.getUniqueId();
             if (PENDING.containsKey(id)) return false; // no re-entrancy
+
+            if (shieldDirection != null
+                    && target instanceof Player victim
+                    && ShieldBlocking.tryBlock(victim, shieldDirection, amount)) {
+                return false;
+            }
 
             if (ignoreIFrames) {
                 target.setNoDamageTicks(0);
@@ -134,9 +152,18 @@ public final class TrueDamage implements Listener {
         for (DamageModifier modifier : DamageModifier.values()) {
             if (modifier == DamageModifier.BASE) continue;
             if (!event.isApplicable(modifier)) continue;
-            if (modifier == DamageModifier.ABSORPTION && !pending.bypassAbsorption()) continue;
             event.setDamage(modifier, 0);
         }
         event.setDamage(DamageModifier.BASE, pending.amount());
+
+        // Absorption hearts soak true damage like any other damage. The vanilla absorption modifier was worked out
+        // before the other modifiers were zeroed (so from a smaller number), which let part of the hit leak through
+        // to real health: recompute it from the full amount.
+        if (!pending.bypassAbsorption()
+                && event.isApplicable(DamageModifier.ABSORPTION)
+                && event.getEntity() instanceof LivingEntity living) {
+            double absorbed = Math.min(living.getAbsorptionAmount(), pending.amount());
+            event.setDamage(DamageModifier.ABSORPTION, -absorbed);
+        }
     }
 }

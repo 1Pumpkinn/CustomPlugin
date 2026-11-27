@@ -13,6 +13,8 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -180,6 +182,15 @@ public final class HatListener implements Listener {
     private void restore(Player player, TakenHat taken, Throwable cause) {
         plugin.getLogger().log(Level.SEVERE, "Could not throw the Hat", cause);
         player.getInventory().setItem(taken.slot(), taken.item());
+    }
+
+    /** Whoever the bounce hat launched takes no fall damage when they come back down. */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onFall(EntityDamageEvent event) {
+        if (event.getCause() != EntityDamageEvent.DamageCause.FALL) return;
+        if (event.getEntity() instanceof LivingEntity living && effects.consumeFallImmunity(living)) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler

@@ -39,6 +39,7 @@ public final class DeathMessages implements Listener {
     public static final String PETAL_BLADE = "petal_blade";
     public static final String TEMPEST_TRIDENT = "tempest_trident";
     public static final String HAT = "hat";
+    public static final String BLOODTHIRST_SCYTHE = "bloodthirst_scythe";
 
     private static final long MARK_WINDOW_MS = 1_000;
     /** Above this many pending marks, the ones whose victim survived are swept out. */
@@ -90,7 +91,11 @@ public final class DeathMessages implements Listener {
             HAT, new Style("Hat", TextColor.color(0xC03030), List.of(
                     "<victim> was shredded by <killer>'s <weapon>",
                     "<killer> sliced <victim> up with a spinning <weapon>",
-                    "<victim> lost a fight with <killer>'s <weapon>")));
+                    "<victim> lost a fight with <killer>'s <weapon>")),
+            BLOODTHIRST_SCYTHE, new Style("Bloodthirst Scythe", TextColor.color(0xC4121F), List.of(
+                    "<victim> was drained dry by <killer>'s <weapon>",
+                    "<killer> swept <victim> away with the <weapon>",
+                    "<victim> fed <killer>'s <weapon>")));
 
     private final Map<UUID, Mark> marks = new HashMap<>();
 
