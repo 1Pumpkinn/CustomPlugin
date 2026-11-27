@@ -1,6 +1,35 @@
 {
   "model": {
-    "type": "minecraft:model",
-    "model": "customplugin:item/tempest_trident"
+    "type": "minecraft:select",
+    "property": "minecraft:display_context",
+    "cases": [
+      {
+        "when": [
+          "gui"
+        ],
+        "model": {
+          "type": "minecraft:model",
+          "model": "customplugin:item/tempest_trident_icon"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:condition",
+      "property": "minecraft:using_item",
+      "on_false": {
+        "type": "minecraft:special",
+        "base": "customplugin:item/tempest_trident_in_hand",
+        "model": {
+          "type": "minecraft:trident"
+        }
+      },
+      "on_true": {
+        "type": "minecraft:special",
+        "base": "customplugin:item/tempest_trident_throwing",
+        "model": {
+          "type": "minecraft:trident"
+        }
+      }
+    }
   }
 }
