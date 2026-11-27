@@ -37,6 +37,7 @@ public final class DeathMessages implements Listener {
     public static final String VOLCANIC_AXE = "volcanic_axe";
     public static final String ZEUS_DISC = "zeus_disc";
     public static final String PETAL_BLADE = "petal_blade";
+    public static final String TEMPEST_TRIDENT = "tempest_trident";
     public static final String HAT = "hat";
 
     private static final long MARK_WINDOW_MS = 1_000;
@@ -80,6 +81,10 @@ public final class DeathMessages implements Listener {
                     "<victim> was cut down by <killer>'s <weapon>",
                     "<killer> sent <victim> off in a flurry of petals",
                     "<victim> wilted to <killer>'s <weapon>")),
+            TEMPEST_TRIDENT, new Style("Tempest Trident", TextColor.color(0x3FC8E0), List.of(
+                    "<victim> was torn apart by <killer>'s <weapon>",
+                    "<killer> trapped <victim> in a tempest with the <weapon>",
+                    "<victim> was swept away by <killer>'s storm")),
             HAT, new Style("Hat", TextColor.color(0xC03030), List.of(
                     "<victim> was shredded by <killer>'s <weapon>",
                     "<killer> sliced <victim> up with a spinning <weapon>",

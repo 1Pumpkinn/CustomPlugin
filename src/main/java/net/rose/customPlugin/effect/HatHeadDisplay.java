@@ -1,6 +1,6 @@
 package net.rose.customPlugin.effect;
 
-import net.rose.customPlugin.item.Hat;
+import net.rose.customPlugin.item.misc.Hat;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;

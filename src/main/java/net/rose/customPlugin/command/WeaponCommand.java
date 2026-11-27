@@ -2,15 +2,17 @@ package net.rose.customPlugin.command;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.rose.customPlugin.item.BloodthirstScythe;
-import net.rose.customPlugin.item.FrostSpear;
-import net.rose.customPlugin.item.Hat;
-import net.rose.customPlugin.item.MetalicMace;
-import net.rose.customPlugin.item.PetalBlade;
-import net.rose.customPlugin.item.TideBlade;
-import net.rose.customPlugin.item.TricksterBow;
-import net.rose.customPlugin.item.VolcanicAxe;
-import net.rose.customPlugin.item.ZeusDisc;
+
+import net.rose.customPlugin.item.*;
+import net.rose.customPlugin.item.axe.VolcanicAxe;
+import net.rose.customPlugin.item.bow.TricksterBow;
+import net.rose.customPlugin.item.disc.ZeusDisc;
+import net.rose.customPlugin.item.mace.MetalicMace;
+import net.rose.customPlugin.item.misc.Hat;
+import net.rose.customPlugin.item.scythe.BloodthirstScythe;
+import net.rose.customPlugin.item.spear.FrostSpear;
+import net.rose.customPlugin.item.sword.PetalBlade;
+import net.rose.customPlugin.item.sword.TideBlade;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;

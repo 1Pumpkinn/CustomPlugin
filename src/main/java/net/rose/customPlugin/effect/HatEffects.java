@@ -1,6 +1,6 @@
 package net.rose.customPlugin.effect;
 
-import net.rose.customPlugin.item.Hat;
+import net.rose.customPlugin.item.misc.Hat;
 import net.rose.customPlugin.util.DeathMessages;
 import net.rose.customPlugin.util.Targets;
 import net.rose.customPlugin.util.TrueDamage;

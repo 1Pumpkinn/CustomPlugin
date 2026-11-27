@@ -3,6 +3,10 @@ package net.rose.customPlugin.item;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
+import net.rose.customPlugin.item.misc.Hat;
+import net.rose.customPlugin.item.scythe.BloodthirstScythe;
+import net.rose.customPlugin.item.sword.PetalBlade;
+import net.rose.customPlugin.item.trident.TempestTrident;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -30,6 +34,7 @@ public final class Legendaries {
                 entry(plugin, "zeus_disc", "Zeus Disc", NamedTextColor.YELLOW),
                 entry(plugin, "petal_blade", "Petal Blade", PetalBlade.PINK),
                 entry(plugin, "bloodthirst_scythe", "Bloodthirst Scythe", BloodthirstScythe.BLOOD),
+                entry(plugin, "tempest_trident", "Tempest Trident", TempestTrident.COLOR),
                 entry(plugin, "hat", "Hat", Hat.COLOR));
     }
 
