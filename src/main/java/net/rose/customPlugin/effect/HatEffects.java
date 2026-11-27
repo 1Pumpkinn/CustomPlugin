@@ -50,8 +50,8 @@ public final class HatEffects {
     private static final float PAD_SCALE = 1.4f;
     private static final double PAD_HALF_WIDTH = 0.5;
     private static final double PAD_ZONE_HEIGHT = 0.45;     // feet inside this much above the floor count as "on it"
-    private static final double BOUNCE_MIN = 0.85;          // launch velocity, blocks/tick
-    private static final double BOUNCE_MAX = 1.5;
+    private static final double BOUNCE_MIN = 1.05;          // launch velocity, blocks/tick
+    private static final double BOUNCE_MAX = 1.8;
     private static final int BOUNCE_COOLDOWN_TICKS = 10;
 
     // --- Razor hat ---

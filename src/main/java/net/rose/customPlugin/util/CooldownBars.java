@@ -4,6 +4,7 @@ import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -31,8 +32,14 @@ public final class CooldownBars {
         this.plugin = plugin;
     }
 
-    /** Starts (or restarts) a cooldown and shows its boss bar. */
+    /** Creative players bypass every ability cooldown: nothing is ever put on cooldown for them. */
+    private static boolean bypasses(Player player) {
+        return player.getGameMode() == GameMode.CREATIVE;
+    }
+
+    /** Starts (or restarts) a cooldown and shows its boss bar. Creative players never get one. */
     public void start(Player player, String id, String label, BossBar.Color color, long durationMs) {
+        if (bypasses(player)) return;
         Map<String, Cooldown> perPlayer = cooldowns.computeIfAbsent(player.getUniqueId(), k -> new HashMap<>());
 
         Cooldown previous = perPlayer.remove(id);
@@ -44,6 +51,7 @@ public final class CooldownBars {
     }
 
     public boolean isOnCooldown(Player player, String id) {
+        if (bypasses(player)) return false;
         Map<String, Cooldown> perPlayer = cooldowns.get(player.getUniqueId());
         if (perPlayer == null) return false;
         Cooldown cooldown = perPlayer.get(id);
@@ -52,6 +60,7 @@ public final class CooldownBars {
 
     /** Milliseconds left on the cooldown, or 0 if it isn't running. */
     public long remainingMillis(Player player, String id) {
+        if (bypasses(player)) return 0;
         Map<String, Cooldown> perPlayer = cooldowns.get(player.getUniqueId());
         if (perPlayer == null) return 0;
         Cooldown cooldown = perPlayer.get(id);
