@@ -13,6 +13,7 @@ import net.rose.customPlugin.item.scythe.BloodthirstScythe;
 import net.rose.customPlugin.item.spear.FrostSpear;
 import net.rose.customPlugin.item.sword.PetalBlade;
 import net.rose.customPlugin.item.sword.TideBlade;
+import net.rose.customPlugin.item.trident.TempestTrident;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -34,7 +35,7 @@ public final class WeaponCommand implements CommandExecutor, TabCompleter {
     private final Map<String, Supplier<ItemStack>> weapons = new LinkedHashMap<>();
 
     public WeaponCommand(TideBlade tideBlade, VolcanicAxe volcanicAxe, FrostSpear frostSpear, MetalicMace metalicMace, TricksterBow tricksterBow, ZeusDisc zeusDisc,
-                         PetalBlade petalBlade, BloodthirstScythe bloodthirstScythe, Hat hat) {
+                         PetalBlade petalBlade, BloodthirstScythe bloodthirstScythe, TempestTrident tempestTrident, Hat hat) {
         weapons.put("tideblade", tideBlade::create);
         weapons.put("volcanicaxe", volcanicAxe::create);
         weapons.put("frostspear", frostSpear::create);
@@ -43,6 +44,7 @@ public final class WeaponCommand implements CommandExecutor, TabCompleter {
         weapons.put("zeusdisc", zeusDisc::create);
         weapons.put("petalblade", petalBlade::create);
         weapons.put("bloodthirstscythe", bloodthirstScythe::create);
+        weapons.put("tempesttrident", tempestTrident::create);
         weapons.put("hat", hat::create);
         // Register future weapons here: weapons.put("name", item::create);
     }

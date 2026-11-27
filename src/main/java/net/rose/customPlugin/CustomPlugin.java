@@ -4,6 +4,7 @@ import net.rose.customPlugin.command.WeaponCommand;
 import net.rose.customPlugin.effect.HatEffects;
 import net.rose.customPlugin.effect.HatHeadDisplay;
 import net.rose.customPlugin.effect.SoulFreezeEffect;
+import net.rose.customPlugin.effect.TempestSpinEffect;
 import net.rose.customPlugin.effect.AxeSpinEffect;
 import net.rose.customPlugin.effect.ChainEffects;
 import net.rose.customPlugin.effect.EruptionEffect;
@@ -21,6 +22,7 @@ import net.rose.customPlugin.item.scythe.BloodthirstScythe;
 import net.rose.customPlugin.item.spear.FrostSpear;
 import net.rose.customPlugin.item.sword.PetalBlade;
 import net.rose.customPlugin.item.sword.TideBlade;
+import net.rose.customPlugin.item.trident.TempestTrident;
 import net.rose.customPlugin.listener.axe.VolcanicAxeListener;
 import net.rose.customPlugin.listener.bow.TricksterBowListener;
 import net.rose.customPlugin.listener.disc.ZeusDiscListener;
@@ -32,6 +34,7 @@ import net.rose.customPlugin.listener.scythe.BloodthirstScytheListener;
 import net.rose.customPlugin.listener.spear.FrostSpearListener;
 import net.rose.customPlugin.listener.sword.PetalBladeListener;
 import net.rose.customPlugin.listener.sword.TideBladeListener;
+import net.rose.customPlugin.listener.trident.TempestTridentListener;
 import net.rose.customPlugin.pack.ResourcePackManager;
 import net.rose.customPlugin.command.WeaponPackCommand;
 import net.rose.customPlugin.util.CooldownBars;
@@ -59,6 +62,8 @@ public final class CustomPlugin extends JavaPlugin {
     private PetalBlade petalBlade;
     private PetalEffect petalEffect;
     private BloodthirstScythe bloodthirstScythe;
+    private TempestTrident tempestTrident;
+    private TempestSpinEffect tempestSpin;
     private Hat hat;
     private HatEffects hatEffects;
     private HatHeadDisplay hatHead;
@@ -83,6 +88,8 @@ public final class CustomPlugin extends JavaPlugin {
         this.petalBlade = new PetalBlade(this);
         this.petalEffect = new PetalEffect(this, deathMessages);
         this.bloodthirstScythe = new BloodthirstScythe(this);
+        this.tempestTrident = new TempestTrident(this);
+        this.tempestSpin = new TempestSpinEffect(this, deathMessages);
         this.hat = new Hat(this);
         this.hatEffects = new HatEffects(this, hat, deathMessages);
         this.hatHead = new HatHeadDisplay(this, hat, hatEffects);
@@ -110,6 +117,8 @@ public final class CustomPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new PetalBladeListener(petalBlade, cooldownBars, petalEffect), this);
         getServer().getPluginManager().registerEvents(
                 new BloodthirstScytheListener(bloodthirstScythe, cooldownBars, frostEffects, new SoulFreezeEffect(this)), this);
+        getServer().getPluginManager().registerEvents(
+                new TempestTridentListener(this, tempestTrident, cooldownBars, tempestSpin), this);
         getServer().getPluginManager().registerEvents(new HatListener(hat, cooldownBars, hatEffects), this);
         hatHead.start();
 
@@ -124,7 +133,7 @@ public final class CustomPlugin extends JavaPlugin {
             packCommand.setTabCompleter(weaponPackCommand);
         }
 
-        WeaponCommand weaponCommand = new WeaponCommand(tideBlade, volcanicAxe, frostSpear, metalicMace, tricksterBow, zeusDisc, petalBlade, bloodthirstScythe, hat);
+        WeaponCommand weaponCommand = new WeaponCommand(tideBlade, volcanicAxe, frostSpear, metalicMace, tricksterBow, zeusDisc, petalBlade, bloodthirstScythe, tempestTrident, hat);
         PluginCommand command = getCommand("weapon");
         if (command != null) {
             command.setExecutor(weaponCommand);
@@ -140,6 +149,7 @@ public final class CustomPlugin extends JavaPlugin {
         if (eruptionEffect != null) eruptionEffect.removeAll();
         if (axeSpinEffect != null) axeSpinEffect.removeAll();
         if (petalEffect != null) petalEffect.removeAll();
+        if (tempestSpin != null) tempestSpin.removeAll();
         if (hatHead != null) hatHead.stop();
         if (hatEffects != null) hatEffects.removeAll();
         if (frostEffects != null) frostEffects.shutdown();
@@ -176,5 +186,9 @@ public final class CustomPlugin extends JavaPlugin {
 
     public BloodthirstScythe getBloodthirstScythe() {
         return bloodthirstScythe;
+    }
+
+    public TempestTrident getTempestTrident() {
+        return tempestTrident;
     }
 }
