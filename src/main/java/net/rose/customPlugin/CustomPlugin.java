@@ -34,6 +34,7 @@ import net.rose.customPlugin.pack.ResourcePackManager;
 import net.rose.customPlugin.command.WeaponPackCommand;
 import net.rose.customPlugin.util.CooldownBars;
 import net.rose.customPlugin.util.DeathMessages;
+import net.rose.customPlugin.util.TrueDamage;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -59,6 +60,7 @@ public final class CustomPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        new TrueDamage(this); // registers its listener; ability damage ignores armor, enchants and resistance
         this.killToken = new KillToken(this);
         this.tideBlade = new TideBlade(this);
         this.volcanicAxe = new VolcanicAxe(this);

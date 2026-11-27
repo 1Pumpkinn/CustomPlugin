@@ -2,13 +2,13 @@ package net.rose.customPlugin.effect;
 
 import net.rose.customPlugin.util.DeathMessages;
 import net.rose.customPlugin.util.Targets;
+import net.rose.customPlugin.util.TrueDamage;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.World;
-import org.bukkit.damage.DamageSource;
 import org.bukkit.damage.DamageType;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.ItemDisplay;
@@ -207,11 +207,7 @@ public final class AxeSpinEffect {
             if (entity instanceof Player victim && victim.isBlocking()) breakShield(victim);
 
             deaths.mark(entity, caster, DeathMessages.VOLCANIC_AXE);
-            entity.damage(HIT_DAMAGE,
-                    DamageSource.builder(DamageType.MAGIC)
-                            .withCausingEntity(caster)
-                            .withDirectEntity(caster)
-                            .build());
+            TrueDamage.of(HIT_DAMAGE).attacker(caster).type(DamageType.MAGIC).apply(entity);
             entity.setFireTicks(Math.max(entity.getFireTicks(), BURN_TICKS));
             entity.getWorld().spawnParticle(Particle.FLAME,
                     entity.getLocation().add(0, 1.0, 0), 12, 0.3, 0.5, 0.3, 0.03);

@@ -22,7 +22,7 @@ import org.bukkit.inventory.EquipmentSlot;
 
 public final class PetalBladeListener implements Listener, PetalEffect.Callbacks {
 
-    private static final long PETALS_COOLDOWN_MS = 60_000;
+    private static final long PETALS_COOLDOWN_MS = 30_000;
     private static final String PETALS_ID = "petal_blade";
 
     private final PetalBlade blade;

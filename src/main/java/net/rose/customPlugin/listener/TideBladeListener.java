@@ -5,9 +5,9 @@ import net.rose.customPlugin.item.TideBlade;
 import net.rose.customPlugin.util.CooldownBars;
 import net.rose.customPlugin.util.DeathMessages;
 import net.rose.customPlugin.util.Targets;
+import net.rose.customPlugin.util.TrueDamage;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
-import org.bukkit.damage.DamageSource;
 import org.bukkit.damage.DamageType;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -133,11 +133,7 @@ public final class TideBladeListener implements Listener {
                     // Drowning damage credited to the attacker, so kills count as theirs.
                     // The DROWN damage type already plays the drowning hurt sound itself.
                     deaths.mark(victim, attacker, DeathMessages.TIDE_BLADE);
-                    victim.damage(DROWN_DAMAGE,
-                            DamageSource.builder(DamageType.DROWN)
-                                    .withCausingEntity(attacker)
-                                    .withDirectEntity(attacker)
-                                    .build());
+                    TrueDamage.of(DROWN_DAMAGE).attacker(attacker).type(DamageType.DROWN).apply(victim);
                 }
 
                 if (ticks % 4 == 0) {

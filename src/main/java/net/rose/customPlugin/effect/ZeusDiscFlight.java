@@ -3,6 +3,7 @@ package net.rose.customPlugin.effect;
 import net.rose.customPlugin.util.DeathMessages;
 import net.rose.customPlugin.util.DiscPathfinder;
 import net.rose.customPlugin.util.Targets;
+import net.rose.customPlugin.util.TrueDamage;
 import org.bukkit.Bukkit;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
@@ -516,7 +517,7 @@ public final class ZeusDiscFlight {
         lastHitTick.put(target.getUniqueId(), age);
         double before = target.getHealth();
         deaths.mark(target, owner, DeathMessages.ZEUS_DISC);
-        target.damage(DISC_DAMAGE, owner);
+        TrueDamage.of(DISC_DAMAGE).attacker(owner).type(org.bukkit.damage.DamageType.PLAYER_ATTACK).apply(target);
         boolean landed = target.isDead() || target.getHealth() < before;
         if (landed) applyKnockback(target);
         world.playSound(

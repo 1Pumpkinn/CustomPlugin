@@ -2,12 +2,12 @@ package net.rose.customPlugin.effect;
 
 import net.rose.customPlugin.util.DeathMessages;
 import net.rose.customPlugin.util.Targets;
+import net.rose.customPlugin.util.TrueDamage;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.World;
-import org.bukkit.damage.DamageSource;
 import org.bukkit.damage.DamageType;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -23,7 +23,7 @@ import java.util.UUID;
 /** The Zeus Disc's electricity: the primed real-lightning strike, and the particle spark-chain passive. Players and mobs are both hit. */
 public final class ZeusLightning {
 
-    private static final double STRIKE_DAMAGE = 5.0;        // same as a vanilla bolt, 2.5 hearts
+    private static final double STRIKE_DAMAGE = 8.0;        // true damage, 4 hearts (the disc itself is 3 hearts)
     private static final double CHAIN_DAMAGE = 1.0;         // half a heart
     private static final double CHAIN_RANGE = 6.0;          // anything this close to a chained target gets zapped too
     private static final int CHAIN_WAVES = 4;               // how many times it can spread outwards
@@ -89,7 +89,7 @@ public final class ZeusLightning {
 
                 arc(from, candidate);
                 sparks(candidate);
-                zap(owner, candidate, CHAIN_DAMAGE, DamageType.MAGIC); // magic ignores armor, so it really is half a heart
+                zap(owner, candidate, CHAIN_DAMAGE, DamageType.MAGIC); // true damage: half a heart
             }
         }
 
@@ -107,12 +107,9 @@ public final class ZeusLightning {
     }
 
     private void zap(Player owner, LivingEntity target, double damage, DamageType type) {
-        target.setNoDamageTicks(0); // the bolt lands even right after the disc hit
         deaths.mark(target, owner, DeathMessages.ZEUS_DISC);
-        target.damage(damage, DamageSource.builder(type)
-                .withCausingEntity(owner)
-                .withDirectEntity(owner)
-                .build());
+        // True damage; lands even right after the disc hit (ignores i-frames).
+        TrueDamage.of(damage).attacker(owner).type(type).apply(target);
     }
 
     /** Sparks along the line between two entities. */

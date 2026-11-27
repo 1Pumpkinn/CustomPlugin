@@ -2,6 +2,7 @@ package net.rose.customPlugin.effect;
 
 import net.rose.customPlugin.util.DeathMessages;
 import net.rose.customPlugin.util.Targets;
+import net.rose.customPlugin.util.TrueDamage;
 import org.bukkit.Color;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
@@ -10,7 +11,6 @@ import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.World;
-import org.bukkit.damage.DamageSource;
 import org.bukkit.damage.DamageType;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.ItemDisplay;
@@ -37,7 +37,7 @@ import java.util.UUID;
 
 /**
  * The Petal Blade's petals: a ring of pink petals that circles the owner, and the throw that fires one
- * of them at whatever the owner is looking at. A petal that connects deals one heart of magic damage.
+ * of them at whatever the owner is looking at. A petal that connects deals one heart of true damage.
  */
 public final class PetalEffect {
 
@@ -324,12 +324,9 @@ public final class PetalEffect {
     }
 
     private void hit(Player owner, LivingEntity victim) {
-        victim.setNoDamageTicks(0); // each petal lands even right after another one
         deaths.mark(victim, owner, DeathMessages.PETAL_BLADE);
-        victim.damage(PETAL_DAMAGE, DamageSource.builder(DamageType.MAGIC)
-                .withCausingEntity(owner)
-                .withDirectEntity(owner)
-                .build());
+        // True damage; ignores i-frames so each petal lands even right after another one.
+        TrueDamage.of(PETAL_DAMAGE).attacker(owner).type(DamageType.MAGIC).apply(victim);
     }
 
     private void end(ItemDisplay display, Location burst) {

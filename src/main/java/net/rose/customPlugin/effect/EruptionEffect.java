@@ -2,6 +2,7 @@ package net.rose.customPlugin.effect;
 
 import net.rose.customPlugin.util.DeathMessages;
 import net.rose.customPlugin.util.Targets;
+import net.rose.customPlugin.util.TrueDamage;
 import org.bukkit.Color;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
@@ -10,7 +11,6 @@ import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.block.data.BlockData;
-import org.bukkit.damage.DamageSource;
 import org.bukkit.damage.DamageType;
 import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Display;
@@ -205,13 +205,8 @@ public final class EruptionEffect {
             double falloff = Math.min(1.0, Math.sqrt(dx * dx + dz * dz) / RADIUS);
             double damage = CENTER_DAMAGE + (EDGE_DAMAGE - CENTER_DAMAGE) * falloff;
 
-            e.setNoDamageTicks(0); // armor-ignoring magic damage should always land at full strength
             deaths.mark(e, caster, DeathMessages.VOLCANIC_AXE);
-            e.damage(damage,
-                    DamageSource.builder(DamageType.MAGIC)
-                            .withCausingEntity(caster)
-                            .withDirectEntity(caster)
-                            .build());
+            TrueDamage.of(damage).attacker(caster).type(DamageType.MAGIC).apply(e);
             e.setFireTicks(BURN_TICKS);
             e.setVelocity(new Vector(0, LAUNCH_VELOCITY, 0));
         }

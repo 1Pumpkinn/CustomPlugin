@@ -2,11 +2,11 @@ package net.rose.customPlugin.effect;
 
 import net.rose.customPlugin.util.DeathMessages;
 import net.rose.customPlugin.util.Targets;
+import net.rose.customPlugin.util.TrueDamage;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.block.data.BlockData;
-import org.bukkit.damage.DamageSource;
 import org.bukkit.damage.DamageType;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
@@ -129,11 +129,7 @@ public final class FrostEffects {
                     applyingDamage = true;
                     try {
                         deaths.mark(victim, attacker, DeathMessages.FROST_SPEAR);
-                        victim.damage(FREEZE_DAMAGE,
-                                DamageSource.builder(DamageType.FREEZE)
-                                        .withCausingEntity(attacker)
-                                        .withDirectEntity(attacker)
-                                        .build());
+                        TrueDamage.of(FREEZE_DAMAGE).attacker(attacker).type(DamageType.FREEZE).apply(victim);
                     } finally {
                         applyingDamage = false;
                     }

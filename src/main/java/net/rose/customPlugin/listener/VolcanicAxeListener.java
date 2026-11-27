@@ -26,8 +26,8 @@ public final class VolcanicAxeListener implements Listener {
 
     private static final double ERUPTION_RANGE = 30.0;
     private static final double RAY_SIZE = 0.8;
-    private static final long ERUPTION_COOLDOWN_MS = 25_000;
-    private static final long SPIN_COOLDOWN_MS = 30_000;
+    private static final long ERUPTION_COOLDOWN_MS = 30_000;
+    private static final long SPIN_COOLDOWN_MS = 45_000;
 
     private static final String ERUPTION_ID = "volcanic_eruption";
     private static final String SPIN_ID = "volcanic_spin";
