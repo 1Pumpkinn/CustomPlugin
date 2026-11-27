@@ -1,9 +1,6 @@
 {
-  "parent": "customplugin:item/tempest_trident",
-  "display": {
-    "thirdperson_righthand": {
-      "rotation": [0, 90, -180],
-      "translation": [0, 11, 1]
-    }
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "customplugin:item/tempest_trident"
   }
 }

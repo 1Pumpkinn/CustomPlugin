@@ -1,3 +1,6 @@
 {
-  "parent": "customplugin:item/tempest_trident"
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "customplugin:item/tempest_trident"
+  }
 }
