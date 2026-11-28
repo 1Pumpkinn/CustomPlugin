@@ -3,8 +3,9 @@ package net.rose.customPlugin.listener.bow;
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.rose.customPlugin.api.AbilityListener;
+import net.rose.customPlugin.api.WeaponContext;
 import net.rose.customPlugin.item.bow.HuntersBow;
-import net.rose.customPlugin.util.CooldownBars;
 import net.rose.customPlugin.util.Targets;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
@@ -14,14 +15,9 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.persistence.PersistentDataType;
-import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
@@ -34,7 +30,7 @@ import java.util.List;
  *   <li>Offhand (F): highlights every player and mob near the shooter.</li>
  * </ul>
  */
-public final class HuntersBowListener implements Listener {
+public final class HuntersBowListener extends AbilityListener<HuntersBow> {
 
     private static final int HIT_HIGHLIGHT_TICKS = 200;       // 10s on whatever the bow hit
     private static final double PULSE_RANGE = 30.0;           // blocks around the shooter
@@ -43,23 +39,15 @@ public final class HuntersBowListener implements Listener {
     private static final long PULSE_COOLDOWN_MS = 30_000;
     private static final String PULSE_ID = "hunters_pulse";
 
-    private final HuntersBow bow;
-    private final CooldownBars cooldowns;
-    private final NamespacedKey arrowKey;
+    private final NamespacedKey arrowKey = key("hunters_arrow");
 
-    public HuntersBowListener(JavaPlugin plugin, HuntersBow bow, CooldownBars cooldowns) {
-        this.bow = bow;
-        this.cooldowns = cooldowns;
-        this.arrowKey = new NamespacedKey(plugin, "hunters_arrow");
+    public HuntersBowListener(WeaponContext context, HuntersBow weapon) {
+        super(context, weapon);
     }
 
-    /** Offhand key (F) while holding the Hunter's Bow highlights nearby players and mobs. The swap itself is always cancelled. */
-    @EventHandler(ignoreCancelled = true)
-    public void onSwapHand(PlayerSwapHandItemsEvent event) {
-        Player player = event.getPlayer();
-        if (!bow.isHuntersBow(player.getInventory().getItemInMainHand())) return;
-
-        event.setCancelled(true);
+    /** F with the bow in hand: highlight everything nearby. The swap is already cancelled by the base class. */
+    @Override
+    protected void onOffhand(Player player, boolean sneaking) {
         pulse(player);
     }
 
@@ -67,7 +55,7 @@ public final class HuntersBowListener implements Listener {
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onShoot(EntityShootBowEvent event) {
         if (!(event.getEntity() instanceof Player)) return;
-        if (!bow.isHuntersBow(event.getBow())) return;
+        if (!weapon.isWeapon(event.getBow())) return;
         if (!(event.getProjectile() instanceof AbstractArrow arrow)) return;
 
         arrow.getPersistentDataContainer().set(arrowKey, PersistentDataType.BYTE, (byte) 1);
@@ -83,16 +71,6 @@ public final class HuntersBowListener implements Listener {
 
         highlight(victim, HIT_HIGHLIGHT_TICKS);
         shooter.playSound(shooter.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.6f, 0.7f);
-    }
-
-    @EventHandler
-    public void onJoin(PlayerJoinEvent event) {
-        cooldowns.resume(event.getPlayer());
-    }
-
-    @EventHandler
-    public void onQuit(PlayerQuitEvent event) {
-        cooldowns.hideAll(event.getPlayer());
     }
 
     private void pulse(Player player) {

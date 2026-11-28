@@ -39,7 +39,7 @@ public final class CooldownBars {
 
     /** Starts (or restarts) a cooldown and shows its boss bar. Creative players never get one. */
     public void start(Player player, String id, String label, BossBar.Color color, long durationMs) {
-        if (bypasses(player)) return;
+        if (bypasses(player) || durationMs <= 0) return; // nothing to wait for (and 0 would make the bar's progress NaN)
         Map<String, Cooldown> perPlayer = cooldowns.computeIfAbsent(player.getUniqueId(), k -> new HashMap<>());
 
         Cooldown previous = perPlayer.remove(id);

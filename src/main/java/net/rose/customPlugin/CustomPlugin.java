@@ -5,6 +5,7 @@ import net.rose.customPlugin.command.WeaponPointsCommand;
 import net.rose.customPlugin.gui.ShopMenu;
 import net.rose.customPlugin.gui.WeaponPointsMenu;
 import net.rose.customPlugin.command.WeaponCommand;
+import net.rose.customPlugin.api.WeaponManager;
 import net.rose.customPlugin.effect.HatEffects;
 import net.rose.customPlugin.effect.VampireSweepEffect;
 import net.rose.customPlugin.effect.TempestSpinEffect;
@@ -29,7 +30,6 @@ import net.rose.customPlugin.item.sword.PetalBlade;
 import net.rose.customPlugin.item.sword.TideBlade;
 import net.rose.customPlugin.item.trident.TempestTrident;
 import net.rose.customPlugin.listener.axe.VolcanicAxeListener;
-import net.rose.customPlugin.listener.bow.HuntersBowListener;
 import net.rose.customPlugin.listener.bow.TricksterBowListener;
 import net.rose.customPlugin.listener.disc.ZeusDiscListener;
 import net.rose.customPlugin.listener.mace.MetalicMaceListener;
@@ -60,7 +60,7 @@ public final class CustomPlugin extends JavaPlugin {
     private FrostEffects frostEffects;
     private MetalicMace metalicMace;
     private TricksterBow tricksterBow;
-    private HuntersBow huntersBow;
+    private WeaponManager weaponManager;
     private ZeusDisc zeusDisc;
     private ResourcePackManager packManager;
     private ZeusDiscListener zeusDiscListener;
@@ -95,7 +95,6 @@ public final class CustomPlugin extends JavaPlugin {
         this.frostEffects = new FrostEffects(this, deathMessages);
         this.metalicMace = new MetalicMace(this);
         this.tricksterBow = new TricksterBow(this);
-        this.huntersBow = new HuntersBow(this);
         this.zeusDisc = new ZeusDisc(this);
         this.chainEffects = new ChainEffects(this);
         this.cooldownBars = new CooldownBars(this);
@@ -112,6 +111,13 @@ public final class CustomPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new KillTokenListener(killToken), this);
         getServer().getPluginManager().registerEvents(deathMessages, this);
         Legendaries legendaries = new Legendaries(this);
+        WeaponRegistry weaponRegistry = new WeaponRegistry(tideBlade, volcanicAxe, frostSpear, metalicMace, tricksterBow, zeusDisc, petalBlade, bloodthirstScythe, tempestTrident, hat);
+
+        // Weapons built on the API (see docs/ADDING_A_WEAPON.md) are registered here, in one line each. This has to
+        // come before the weapon limit, dropped-item beacon and shop, which look weapons up when they start.
+        this.weaponManager = new WeaponManager(this, legendaries, weaponRegistry, cooldownBars, deathMessages);
+        weaponManager.register(new HuntersBow(this));
+
         getServer().getPluginManager().registerEvents(new LegendaryDeathListener(this, legendaries), this);
         this.weaponLimit = new WeaponLimitListener(this, legendaries);
         getServer().getPluginManager().registerEvents(weaponLimit, this);
@@ -123,7 +129,6 @@ public final class CustomPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(
                 new MetalicMaceListener(this, metalicMace, cooldownBars, chainEffects), this);
         getServer().getPluginManager().registerEvents(new TricksterBowListener(this, tricksterBow, cooldownBars), this);
-        getServer().getPluginManager().registerEvents(new HuntersBowListener(this, huntersBow, cooldownBars), this);
         this.zeusDiscListener = new ZeusDiscListener(this, zeusDisc, cooldownBars,
                 new ZeusLightning(this, deathMessages), deathMessages);
         getServer().getPluginManager().registerEvents(zeusDiscListener, this);
@@ -158,7 +163,6 @@ public final class CustomPlugin extends JavaPlugin {
             reloadCommand.setTabCompleter(reload);
         }
 
-        WeaponRegistry weaponRegistry = new WeaponRegistry(tideBlade, volcanicAxe, frostSpear, metalicMace, tricksterBow, huntersBow, zeusDisc, petalBlade, bloodthirstScythe, tempestTrident, hat);
         WeaponCommand weaponCommand = new WeaponCommand(weaponRegistry);
         PluginCommand command = getCommand("weapon");
         if (command != null) {
@@ -198,6 +202,7 @@ public final class CustomPlugin extends JavaPlugin {
         if (hatEffects != null) hatEffects.removeAll();
         if (frostEffects != null) frostEffects.shutdown();
         if (chainEffects != null) chainEffects.shutdown();
+        if (weaponManager != null) weaponManager.shutdown();
     }
 
     public KillToken getKillToken() {

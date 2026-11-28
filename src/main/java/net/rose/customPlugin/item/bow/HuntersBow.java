@@ -1,53 +1,34 @@
 package net.rose.customPlugin.item.bow;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
-import net.kyori.adventure.text.format.TextDecoration;
-import net.rose.customPlugin.util.MaxEnchants;
+import net.rose.customPlugin.api.Ability;
+import net.rose.customPlugin.api.CustomWeapon;
+import net.rose.customPlugin.api.WeaponContext;
+import net.rose.customPlugin.listener.bow.HuntersBowListener;
 import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
 
-public final class HuntersBow {
+/** Reference implementation of the weapon API: the item is described here, the abilities live in the listener. */
+public final class HuntersBow extends CustomWeapon {
 
     public static final TextColor COLOR = TextColor.color(0xE8890C);
 
-    private final NamespacedKey key;
-
     public HuntersBow(JavaPlugin plugin) {
-        this.key = new NamespacedKey(plugin, "hunters_bow");
+        super(plugin, "huntersbow", "hunters_bow", "Hunter's Bow", COLOR, Material.BOW);
     }
 
-    public ItemStack create() {
-        ItemStack item = new ItemStack(Material.BOW);
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(Component.text("Hunter's Bow", COLOR)
-                .decoration(TextDecoration.ITALIC, false));
-        meta.lore(List.of(
-                ability("Offhand", "Highlight every player and mob near you, so they can be seen through walls"),
-                ability("Passive", "Players and mobs hit by your arrows are highlighted")
-        ));
-        meta.setItemModel(key); // texture pack model: customplugin:<name>
-        meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
-        item.setItemMeta(meta);
-        MaxEnchants.apply(item); // weapons always come fully enchanted
-        return item;
+    @Override
+    public List<Ability> abilities() {
+        return List.of(
+                Ability.offhand("Highlight every player and mob near you, so they can be seen through walls"),
+                Ability.passive("Players and mobs hit by your arrows are highlighted"));
     }
 
-    public boolean isHuntersBow(ItemStack item) {
-        if (item == null || !item.hasItemMeta()) return false;
-        return item.getItemMeta().getPersistentDataContainer().has(key, PersistentDataType.BYTE);
-    }
-
-    private static Component ability(String trigger, String description) {
-        return Component.text(trigger, COLOR)
-                .append(Component.text(" - " + description, NamedTextColor.GRAY))
-                .decoration(TextDecoration.ITALIC, false);
+    @Override
+    public Listener createListener(WeaponContext context) {
+        return new HuntersBowListener(context, this);
     }
 }

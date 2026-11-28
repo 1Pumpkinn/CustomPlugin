@@ -105,14 +105,17 @@ public final class LungeCooldown implements Listener {
         cancel(suppression.remove(id));
         thresholds.remove(id);
         knockbackGraceUntil.remove(id);
-        endsAt.remove(id);
+        // endsAt stays: logging out and back in must not reset the cooldown. start() drops expired entries, so a
+        // player who never returns does not stay in the map for long.
     }
 
     // ---------------------------------------------------------------- Cooldown + action bar countdown
 
     private void start(Player player) {
         UUID id = player.getUniqueId();
-        endsAt.put(id, System.currentTimeMillis() + LUNGE_COOLDOWN_MS);
+        long now = System.currentTimeMillis();
+        endsAt.values().removeIf(end -> end <= now);
+        endsAt.put(id, now + LUNGE_COOLDOWN_MS);
 
         cancel(display.remove(id));
         display.put(id, plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {

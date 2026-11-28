@@ -1,7 +1,6 @@
 package net.rose.customPlugin.item;
 
 import net.rose.customPlugin.item.axe.VolcanicAxe;
-import net.rose.customPlugin.item.bow.HuntersBow;
 import net.rose.customPlugin.item.bow.TricksterBow;
 import net.rose.customPlugin.item.disc.ZeusDisc;
 import net.rose.customPlugin.item.mace.MetalicMace;
@@ -26,20 +25,19 @@ public final class WeaponRegistry {
     private final Map<String, Supplier<ItemStack>> weapons = new LinkedHashMap<>();
 
     public WeaponRegistry(TideBlade tideBlade, VolcanicAxe volcanicAxe, FrostSpear frostSpear, MetalicMace metalicMace,
-                          TricksterBow tricksterBow, HuntersBow huntersBow, ZeusDisc zeusDisc, PetalBlade petalBlade,
+                          TricksterBow tricksterBow, ZeusDisc zeusDisc, PetalBlade petalBlade,
                           BloodthirstScythe bloodthirstScythe, TempestTrident tempestTrident, Hat hat) {
         register("tideblade", tideBlade::create);
         register("volcanicaxe", volcanicAxe::create);
         register("frostspear", frostSpear::create);
         register("metalicmace", metalicMace::create);
         register("tricksterbow", tricksterBow::create);
-        register("huntersbow", huntersBow::create);
         register("zeusdisc", zeusDisc::create);
         register("petalblade", petalBlade::create);
         register("bloodthirstscythe", bloodthirstScythe::create);
         register("tempesttrident", tempestTrident::create);
         register("hat", hat::create);
-        // Register future weapons here: register("name", item::create);
+        // New weapons do not go here: extend CustomWeapon and call WeaponManager.register (see docs/ADDING_A_WEAPON.md).
     }
 
     public void register(String id, Supplier<ItemStack> supplier) {

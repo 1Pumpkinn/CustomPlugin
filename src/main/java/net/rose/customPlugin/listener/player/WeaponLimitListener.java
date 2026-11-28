@@ -54,6 +54,8 @@ public final class WeaponLimitListener implements Listener {
     private static final int OFFHAND_SLOT = 40;
     private static final int STORAGE_SLOTS = 36;
     private static final long CHECK_INTERVAL_TICKS = 20L;
+    /** How long a player's pickup order is remembered after they log out (30 minutes). */
+    private static final long FORGET_PICKUP_ORDER_TICKS = 30L * 60L * 20L;
 
     private final JavaPlugin plugin;
     private final Legendaries legendaries;
@@ -358,6 +360,13 @@ public final class WeaponLimitListener implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        notified.remove(event.getPlayer().getUniqueId());
+        UUID id = event.getPlayer().getUniqueId();
+        notified.remove(id);
+        if (!plugin.isEnabled()) return;
+        // The pickup order is kept for a while, so logging out and back in cannot reshuffle which weapon goes over
+        // the limit. It must not be kept forever for players who never come back.
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            if (plugin.getServer().getPlayer(id) == null) acquired.remove(id);
+        }, FORGET_PICKUP_ORDER_TICKS);
     }
 }

@@ -6,6 +6,7 @@ import net.rose.customPlugin.item.trident.TempestTrident;
 import net.rose.customPlugin.util.CooldownBars;
 import net.rose.customPlugin.util.Targets;
 import org.bukkit.GameMode;
+import org.bukkit.Location;
 import org.bukkit.Sound;
 import org.bukkit.entity.AbstractArrow;
 import org.bukkit.entity.Entity;
@@ -101,11 +102,16 @@ public final class TempestTridentListener implements Listener {
 
         thrown.setPickupStatus(AbstractArrow.PickupStatus.DISALLOWED);
         ItemStack returned = thrown.getItemStack().clone();
+        Location hitAt = thrown.getLocation();
 
         // One tick later, after vanilla has finished handling the hit.
         plugin.getServer().getScheduler().runTask(plugin, () -> {
             if (thrown.isValid()) thrown.remove();
-            if (!thrower.isOnline()) return;
+            if (!thrower.isOnline()) {
+                // The thrower left in that tick: the trident must not vanish with them.
+                if (thrower.getGameMode() != GameMode.CREATIVE) hitAt.getWorld().dropItemNaturally(hitAt, returned);
+                return;
+            }
 
             spin.start(thrower, victim);
             if (thrower.getGameMode() == GameMode.CREATIVE) return; // creative throws never used the item up

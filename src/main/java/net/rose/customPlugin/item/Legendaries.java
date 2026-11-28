@@ -3,7 +3,6 @@ package net.rose.customPlugin.item;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
-import net.rose.customPlugin.item.bow.HuntersBow;
 import net.rose.customPlugin.item.misc.Hat;
 import net.rose.customPlugin.item.scythe.BloodthirstScythe;
 import net.rose.customPlugin.item.sword.PetalBlade;
@@ -30,18 +29,22 @@ public final class Legendaries {
     private final List<Entry> entries;
 
     public Legendaries(JavaPlugin plugin) {
-        this.entries = List.of(
+        this.entries = new ArrayList<>(List.of(
                 entry(plugin, "tide_blade", "tideblade", "Tide Blade", NamedTextColor.AQUA),
                 entry(plugin, "volcanic_axe", "volcanicaxe", "Volcanic Axe", NamedTextColor.GOLD),
                 entry(plugin, "frost_spear", "frostspear", "Frost Spear", NamedTextColor.AQUA),
                 entry(plugin, "metalic_mace", "metalicmace", "Metalic Mace", NamedTextColor.GRAY),
                 entry(plugin, "trickster_bow", "tricksterbow", "Trickster Bow", NamedTextColor.LIGHT_PURPLE),
-                entry(plugin, "hunters_bow", "huntersbow", "Hunter's Bow", HuntersBow.COLOR),
                 entry(plugin, "zeus_disc", "zeusdisc", "Zeus Disc", NamedTextColor.YELLOW),
                 entry(plugin, "petal_blade", "petalblade", "Petal Blade", PetalBlade.PINK),
                 entry(plugin, "bloodthirst_scythe", "bloodthirstscythe", "Bloodthirst Scythe", BloodthirstScythe.BLOOD),
                 entry(plugin, "tempest_trident", "tempesttrident", "Tempest Trident", TempestTrident.COLOR),
-                entry(plugin, "hat", "hat", "Hat", Hat.COLOR));
+                entry(plugin, "hat", "hat", "Hat", Hat.COLOR)));
+    }
+
+    /** Adds a weapon made through the API (see WeaponManager). Weapons added here count everywhere the built-in ones do. */
+    public void register(NamespacedKey key, String id, String name, TextColor color) {
+        entries.add(new Entry(key, new Weapon(id, name, color)));
     }
 
     /** Colored names of the distinct custom weapons anywhere in the player's inventory, armor and offhand included. */
