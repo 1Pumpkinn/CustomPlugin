@@ -12,6 +12,7 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
+import java.util.Set;
 
 public final class FrostSpear {
 
@@ -33,7 +34,7 @@ public final class FrostSpear {
         meta.setItemModel(key); // texture pack model: customplugin:<name>
         meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
         item.setItemMeta(meta);
-        MaxEnchants.apply(item); // weapons always come fully enchanted
+        MaxEnchants.apply(item, Set.of("fire_aspect")); // fully enchanted, but a frost spear never burns
         return item;
     }
 

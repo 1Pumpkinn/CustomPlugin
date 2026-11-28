@@ -35,6 +35,11 @@ public final class MaxEnchants {
     }
 
     public static void apply(ItemStack item) {
+        apply(item, Set.of());
+    }
+
+    /** Like {@link #apply(ItemStack)}, but never adds the named enchantments (e.g. "fire_aspect"). */
+    public static void apply(ItemStack item, Set<String> skip) {
         Registry<Enchantment> registry = RegistryAccess.registryAccess().getRegistry(RegistryKey.ENCHANTMENT);
 
         Set<Enchantment> ordered = new LinkedHashSet<>();
@@ -49,7 +54,7 @@ public final class MaxEnchants {
         List<Enchantment> applied = new ArrayList<>();
         for (Enchantment enchantment : ordered) {
             String name = enchantment.getKey().getKey();
-            if (name.endsWith("_curse") || SKIPPED.contains(name)) continue;
+            if (name.endsWith("_curse") || SKIPPED.contains(name) || skip.contains(name)) continue;
             if (!enchantment.canEnchantItem(item)) continue;
             boolean conflicts = false;
             for (Enchantment other : applied) {

@@ -248,7 +248,10 @@ public final class MetalicMaceListener implements Listener {
 
                 Vector toward = player.getLocation().toVector().subtract(target.getLocation().toVector());
                 Vector velocity = toward.normalize().multiply(PULL_SPEED);
-                velocity.setY(Math.max(velocity.getY(), PULL_LIFT));
+                // Lift off the floor only when the target is level with or below you; a target above you
+                // keeps the downward part of the pull so it actually comes down to you.
+                boolean above = target.getLocation().getY() > player.getLocation().getY() + 0.5;
+                if (!above) velocity.setY(Math.max(velocity.getY(), PULL_LIFT));
                 target.setVelocity(velocity);
                 ticks++;
             }

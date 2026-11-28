@@ -9,12 +9,13 @@ import org.bukkit.Sound;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.attribute.AttributeModifier;
-import org.bukkit.block.data.BlockData;
-import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Display;
+import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.EquipmentSlotGroup;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -46,17 +47,27 @@ public final class ChainEffects {
 
     private static final float CHAIN_THICKNESS = 1.5f;      // scales the chain's width so it reads from a distance
     private static final int SMOOTHING_TICKS = 2;
+    private static final float SPIN_PER_TICK = 0.35f;      // radians the chain twists around its own length each tick (~1 turn a second)
 
-    private static final BlockData CHAIN = chainMaterial().createBlockData();
+    /** The long axis of customplugin:item/chain as modelled (it lies along X). Change this if the model is turned. */
+    private static final Vector3f MODEL_AXIS = new Vector3f(1f, 0f, 0f);
 
     private final JavaPlugin plugin;
     private final NamespacedKey jumpLockKey;
+    private final ItemStack chainItem;
     private final Map<UUID, Bind> binds = new HashMap<>();
     private final Set<Link> links = new HashSet<>();
 
     public ChainEffects(JavaPlugin plugin) {
         this.plugin = plugin;
         this.jumpLockKey = new NamespacedKey(plugin, "chain_jump_lock");
+
+        // The chain model from the resource pack (customplugin:item/chain); the base item is never seen.
+        ItemStack stack = new ItemStack(Material.STICK);
+        ItemMeta meta = stack.getItemMeta();
+        meta.setItemModel(new NamespacedKey(plugin, "chain"));
+        stack.setItemMeta(meta);
+        this.chainItem = stack;
     }
 
     /** Whether the player is currently bound by somebody's chain. */
@@ -141,42 +152,49 @@ public final class ChainEffects {
         return copy;
     }
 
-    private static BlockDisplay spawnSegment(Location at) {
-        return at.getWorld().spawn(flat(at), BlockDisplay.class, display -> {
-            display.setBlock(CHAIN);
-            display.setBrightness(new Display.Brightness(15, 15));
-            display.setPersistent(false);
+    /**
+     * Spawns a chain segment already pointing the right way. The transformation is set before the entity is
+     * added and without an interpolation start, so it never shows (or swings in from) the default upright pose.
+     */
+    private ItemDisplay spawnSegment(Location at, Vector direction, double length, float roll) {
+        ItemDisplay display = at.getWorld().spawn(flat(at), ItemDisplay.class, spawned -> {
+            spawned.setItemStack(chainItem.clone());
+            spawned.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.NONE);
+            spawned.setBrightness(new Display.Brightness(15, 15));
+            spawned.setPersistent(false);
+            spawned.setTeleportDuration(0);
+            spawned.setInterpolationDuration(0);
+            spawned.setTransformation(transformation(direction, length, roll));
+        });
+        // Smoothing is turned on a tick later, once the client has the first pose.
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!display.isValid()) return;
             display.setTeleportDuration(SMOOTHING_TICKS);
             display.setInterpolationDuration(SMOOTHING_TICKS);
         });
+        return display;
     }
 
-    /** Points the chain's long axis along direction and stretches it to length, keeping the block centred on the entity. */
-    private static void orient(BlockDisplay display, Vector direction, double length) {
+    /** Points the chain model's long axis along direction and stretches it to length. Item displays centre the model on the entity. */
+    private static Transformation transformation(Vector direction, double length, float roll) {
         Quaternionf rotation = new Quaternionf().rotationTo(
-                new Vector3f(0f, 1f, 0f),
+                MODEL_AXIS,
                 new Vector3f((float) direction.getX(), (float) direction.getY(), (float) direction.getZ()));
-        Vector3f scale = new Vector3f(CHAIN_THICKNESS, (float) length, CHAIN_THICKNESS);
-        Vector3f translation = new Vector3f(scale.x * 0.5f, scale.y * 0.5f, scale.z * 0.5f)
-                .rotate(rotation)
-                .negate();
+        // Twist around the chain's own length first, then point it along direction.
+        rotation.rotateAxis(roll, MODEL_AXIS);
+        Vector3f scale = new Vector3f((float) length, CHAIN_THICKNESS, CHAIN_THICKNESS);
+        return new Transformation(new Vector3f(), rotation, scale, new Quaternionf());
+    }
 
+    private static void orient(ItemDisplay display, Vector direction, double length, float roll) {
         display.setInterpolationDelay(0);
-        display.setTransformation(new Transformation(translation, rotation, scale, new Quaternionf()));
+        display.setTransformation(transformation(direction, length, roll));
     }
 
-    /** The chain block (renamed to iron chain in 1.21.9), falling back to iron bars. */
-    private static Material chainMaterial() {
-        for (String name : new String[] {"IRON_CHAIN", "CHAIN"}) {
-            Material material = Material.matchMaterial(name);
-            if (material != null) return material;
-        }
-        return Material.IRON_BARS;
-    }
-
-    /** Chain blocks laid end to end between two points, reused and restretched on every update. */
+    /** Chain models laid end to end between two points, reused and restretched on every update. */
     public final class Link {
-        private final List<BlockDisplay> segments = new ArrayList<>();
+        private final List<ItemDisplay> segments = new ArrayList<>();
+        private float roll = 0f;
 
         private Link() {
         }
@@ -191,20 +209,24 @@ public final class ChainEffects {
                 segments.remove(segments.size() - 1).remove();
             }
 
+            roll += SPIN_PER_TICK;
             Vector direction = delta.multiply(1.0 / length);
             double segmentLength = length / count;
             for (int i = 0; i < count; i++) {
                 Location middle = flat(from).add(direction.clone().multiply(segmentLength * (i + 0.5)));
-                if (i >= segments.size()) segments.add(spawnSegment(middle));
+                if (i >= segments.size()) {
+                    segments.add(spawnSegment(middle, direction, segmentLength, roll)); // born in the right pose
+                    continue;
+                }
 
-                BlockDisplay display = segments.get(i);
-                orient(display, direction, segmentLength);
+                ItemDisplay display = segments.get(i);
+                orient(display, direction, segmentLength, roll);
                 display.teleport(middle);
             }
         }
 
         public void remove() {
-            for (BlockDisplay display : segments) {
+            for (ItemDisplay display : segments) {
                 display.remove();
             }
             segments.clear();
