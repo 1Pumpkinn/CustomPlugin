@@ -84,7 +84,8 @@ weapons:
 # Weapon points. Every custom weapon in a player's inventory costs points, depending on its tier (see weapons above).
 # When the weapons a player carries add up to more than max-points, the weapon that goes over is disabled: it can't
 # be used for its abilities or to attack until the player drops or gets rid of enough other weapons. Weapons are
-# counted oldest first (the order the player picked them up in), so the newest weapon is the one that gets disabled.
+# counted from least to most expensive (equally expensive ones in the order the player picked them up), so the most
+# expensive weapon is the one that gets disabled.
 # /weaponpoints opens a menu showing the weapons a player carries and how many points they are using.
 # Players with the customplugin.weaponlimit.bypass permission are not limited.
 weapon-limit:

@@ -6,7 +6,7 @@ import net.kyori.adventure.text.format.TextDecoration;
 import net.rose.customPlugin.item.Legendaries;
 import net.rose.customPlugin.item.WeaponRegistry;
 import net.rose.customPlugin.item.misc.KillToken;
-import net.rose.customPlugin.listener.player.WeaponLimitListener;
+import net.rose.customPlugin.item.WeaponLimit;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Sound;
@@ -38,7 +38,7 @@ import java.util.TreeSet;
  * <p>Prices come from config.yml (see WeaponSettings). A weapon's price is, in order: {@code weapons.<id>.price},
  * then its tier's {@code shop.tier-prices.<tier>}, then {@code shop.default-price}. Buying has nothing to do with the weapon limit:
  * a weapon bought past the limit is simply disabled until the player has room for it
- * (see {@link WeaponLimitListener}).
+ * (see {@link WeaponLimit}).
  */
 public final class ShopMenu implements Listener {
 
@@ -53,7 +53,7 @@ public final class ShopMenu implements Listener {
 
     private final JavaPlugin plugin;
     private final WeaponRegistry weapons;
-    private final WeaponLimitListener limit;
+    private final WeaponLimit limit;
     private final KillToken killToken;
 
     /** Marks an inventory as this menu and remembers its state: the tier on show and what sits in which slot. */
@@ -71,7 +71,7 @@ public final class ShopMenu implements Listener {
         }
     }
 
-    public ShopMenu(JavaPlugin plugin, WeaponRegistry weapons, WeaponLimitListener limit, KillToken killToken) {
+    public ShopMenu(JavaPlugin plugin, WeaponRegistry weapons, WeaponLimit limit, KillToken killToken) {
         this.plugin = plugin;
         this.weapons = weapons;
         this.limit = limit;
@@ -106,7 +106,7 @@ public final class ShopMenu implements Listener {
     private void populate(Holder holder, Player player) {
         Inventory inventory = holder.inventory;
         int tokens = killToken.count(player.getInventory());
-        WeaponLimitListener.Summary summary = limit.summarize(player);
+        WeaponLimit.Summary summary = limit.summarize(player);
         boolean limited = limit.isLimited(player);
 
         ItemStack filler = filler();
@@ -214,7 +214,7 @@ public final class ShopMenu implements Listener {
 
     // ---- items ----------------------------------------------------------------------------------------------------
 
-    private ItemStack icon(String id, int tokens, WeaponLimitListener.Summary summary, boolean limited) {
+    private ItemStack icon(String id, int tokens, WeaponLimit.Summary summary, boolean limited) {
         ItemStack item = weapons.create(id);
         Legendaries.Weapon weapon = limit.identify(item);
 
@@ -260,7 +260,7 @@ public final class ShopMenu implements Listener {
         return item;
     }
 
-    private ItemStack balanceItem(int tokens, WeaponLimitListener.Summary summary, boolean limited) {
+    private ItemStack balanceItem(int tokens, WeaponLimit.Summary summary, boolean limited) {
         ItemStack item = new ItemStack(Material.RED_DYE);
         ItemMeta meta = item.getItemMeta();
         meta.displayName(line("Your kill tokens: ", NamedTextColor.RED)

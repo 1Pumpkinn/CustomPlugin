@@ -3,7 +3,7 @@ package net.rose.customPlugin.gui;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import net.rose.customPlugin.listener.player.WeaponLimitListener;
+import net.rose.customPlugin.item.WeaponLimit;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -32,7 +32,7 @@ public final class WeaponPointsMenu implements Listener {
     private static final int MAX_INNER_ROWS = 4;
 
     private final JavaPlugin plugin;
-    private final WeaponLimitListener limit;
+    private final WeaponLimit limit;
     private final ShopMenu shop;
 
     /** Marks an inventory as this menu and remembers where its shop button is. */
@@ -46,15 +46,15 @@ public final class WeaponPointsMenu implements Listener {
         }
     }
 
-    public WeaponPointsMenu(JavaPlugin plugin, WeaponLimitListener limit, ShopMenu shop) {
+    public WeaponPointsMenu(JavaPlugin plugin, WeaponLimit limit, ShopMenu shop) {
         this.plugin = plugin;
         this.limit = limit;
         this.shop = shop;
     }
 
     public void open(Player player) {
-        WeaponLimitListener.Summary summary = limit.summarize(player);
-        List<WeaponLimitListener.Carried> carried = summary.weapons();
+        WeaponLimit.Summary summary = limit.summarize(player);
+        List<WeaponLimit.Carried> carried = summary.weapons();
         int shown = Math.min(carried.size(), WEAPONS_PER_ROW * MAX_INNER_ROWS);
 
         int innerRows = Math.max(1, (shown + WEAPONS_PER_ROW - 1) / WEAPONS_PER_ROW);
@@ -109,7 +109,7 @@ public final class WeaponPointsMenu implements Listener {
     // ---- items ----------------------------------------------------------------------------------------------------
 
     /** The weapon as the player has it, with what it costs and whether it is active. */
-    private ItemStack icon(Player player, WeaponLimitListener.Carried carried) {
+    private ItemStack icon(Player player, WeaponLimit.Carried carried) {
         ItemStack item = player.getInventory().getItem(carried.slot());
         item = item == null ? new ItemStack(Material.BARRIER) : item.clone();
 
@@ -132,7 +132,7 @@ public final class WeaponPointsMenu implements Listener {
         return item;
     }
 
-    private ItemStack balanceItem(Player player, WeaponLimitListener.Summary summary) {
+    private ItemStack balanceItem(Player player, WeaponLimit.Summary summary) {
         ItemStack item = new ItemStack(Material.GOLD_INGOT);
         ItemMeta meta = item.getItemMeta();
         boolean limited = limit.isLimited(player);

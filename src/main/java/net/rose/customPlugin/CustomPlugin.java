@@ -8,6 +8,7 @@ import net.rose.customPlugin.command.WeaponCommand;
 import net.rose.customPlugin.api.WeaponManager;
 import net.rose.customPlugin.effect.FrostEffects;
 import net.rose.customPlugin.item.Legendaries;
+import net.rose.customPlugin.item.WeaponLimit;
 import net.rose.customPlugin.item.WeaponRegistry;
 import net.rose.customPlugin.item.axe.VolcanicAxe;
 import net.rose.customPlugin.item.bow.HuntersBow;
@@ -40,7 +41,8 @@ public final class CustomPlugin extends JavaPlugin {
     private ResourcePackManager packManager;
     private CooldownBars cooldownBars;
     private FrostEffects frostEffects;
-    private WeaponLimitListener weaponLimit;
+    private WeaponLimit weaponLimit;
+    private WeaponLimitNotifier limitNotifier;
 
     @Override
     public void onEnable() {
@@ -78,8 +80,9 @@ public final class CustomPlugin extends JavaPlugin {
         weaponManager.register(new HuntersBow(this));
 
         getServer().getPluginManager().registerEvents(new LegendaryDeathListener(this, legendaries), this);
-        this.weaponLimit = new WeaponLimitListener(this, legendaries);
-        getServer().getPluginManager().registerEvents(weaponLimit, this);
+        this.weaponLimit = new WeaponLimit(this, legendaries);
+        this.limitNotifier = new WeaponLimitNotifier(this, weaponLimit);
+        getServer().getPluginManager().registerEvents(new WeaponLimitListener(weaponLimit, limitNotifier), this);
         getServer().getPluginManager().registerEvents(new EgapListener(), this);
         getServer().getPluginManager().registerEvents(new StunListener(frostEffects), this);
         new LungeCooldown(this).register();
@@ -131,6 +134,7 @@ public final class CustomPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         if (packManager != null) packManager.stop();
+        if (limitNotifier != null) limitNotifier.shutdown();
         if (weaponLimit != null) weaponLimit.shutdown();
         if (cooldownBars != null) cooldownBars.shutdown();
         if (frostEffects != null) frostEffects.shutdown();
