@@ -1,6 +1,8 @@
 package net.rose.customPlugin;
 
+import net.rose.customPlugin.command.ShopCommand;
 import net.rose.customPlugin.command.WeaponPointsCommand;
+import net.rose.customPlugin.gui.ShopMenu;
 import net.rose.customPlugin.gui.WeaponPointsMenu;
 import net.rose.customPlugin.command.WeaponCommand;
 import net.rose.customPlugin.effect.HatEffects;
@@ -152,7 +154,14 @@ public final class CustomPlugin extends JavaPlugin {
         // Weapons keep the lore they were created with, so give existing ones the current description.
         getServer().getPluginManager().registerEvents(new WeaponLoreRefresher(weaponRegistry, legendaries), this);
 
-        WeaponPointsMenu weaponPointsMenu = new WeaponPointsMenu(weaponRegistry, weaponLimit);
+        ShopMenu shopMenu = new ShopMenu(this, weaponRegistry, weaponLimit, killToken);
+        getServer().getPluginManager().registerEvents(shopMenu, this);
+        PluginCommand shopCommand = getCommand("shop");
+        if (shopCommand != null) {
+            shopCommand.setExecutor(new ShopCommand(shopMenu));
+        }
+
+        WeaponPointsMenu weaponPointsMenu = new WeaponPointsMenu(this, weaponLimit, shopMenu);
         getServer().getPluginManager().registerEvents(weaponPointsMenu, this);
         PluginCommand weaponPointsCommand = getCommand("weaponpoints");
         if (weaponPointsCommand != null) {

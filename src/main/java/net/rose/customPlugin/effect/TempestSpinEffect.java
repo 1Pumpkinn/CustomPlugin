@@ -119,14 +119,9 @@ public final class TempestSpinEffect {
                 }
 
                 World w = centre.getWorld();
-                // Sparks at the prongs, a cloud at the handle.
+                // Sparks at the prongs.
                 Location tip = orbit(centre, angle, radius - HALF_LENGTH);
-                Location tail = orbit(centre, angle, radius + HALF_LENGTH);
                 w.spawnParticle(Particle.ELECTRIC_SPARK, tip, 2, 0.15, 0.15, 0.15, 0.05);
-                w.spawnParticle(Particle.CLOUD, tail, 2, 0.1, 0.1, 0.1, 0.01);
-                if (ticks % 4 == 0) {
-                    w.spawnParticle(Particle.SWEEP_ATTACK, centre, 1, 0.6, 0.4, 0.6, 0.0);
-                }
                 if (ticks % 5 == 0) {
                     w.playSound(centre, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.6f, 0.8f);
                 }

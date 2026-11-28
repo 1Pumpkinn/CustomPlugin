@@ -36,10 +36,10 @@ dropped-item-beacon:
 # as every tier used in weapon-tiers has an entry in tier-points.
 #
 # When the weapons a player carries add up to more than max-points, the weapon that goes over is disabled: it can't
-# be used for its abilities or to attack until the player drops or gets rid of enough other weapons. Slots are counted
-# in order (hotbar left to right, then the rest of the inventory, then the offhand), so the later weapon is the one
-# that gets disabled. /weaponpoints opens a menu showing the tiers and how many points a player is using. Players
-# with the customplugin.weaponlimit.bypass permission are not limited.
+# be used for its abilities or to attack until the player drops or gets rid of enough other weapons. Weapons are
+# counted oldest first (the order the player picked them up in), so the newest weapon is the one
+# that gets disabled. /weaponpoints opens a menu showing the weapons a player carries and how many points they are
+# using. Players with the customplugin.weaponlimit.bypass permission are not limited.
 weapon-limit:
   enabled: true
   max-points: 6
@@ -62,3 +62,19 @@ weapon-limit:
     hat: 3
   # Tier for any weapon not listed in weapon-tiers (new weapons stay expensive until you place them).
   default-tier: 1
+
+# /shop: weapons are bought with kill tokens (the red dye a player drops when they die in PvP). A weapon costs its
+# tier's price (tiers come from weapon-limit.weapon-tiers above); add a weapon to weapon-prices to give it its own
+# price instead, e.g. "zeusdisc: 10". Buying has no effect on the weapon limit: a weapon bought past
+# weapon-limit.max-points is simply disabled until the player has the room for it.
+shop:
+  # Kill tokens each tier costs.
+  tier-prices:
+    1: 5
+    2: 3
+    3: 2
+  # Price for a tier that is not listed above.
+  default-price: 5
+  # Optional per-weapon prices, by /weapon name (these win over tier-prices):
+  # weapon-prices:
+  #   zeusdisc: 10

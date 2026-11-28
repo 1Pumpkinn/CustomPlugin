@@ -5,6 +5,7 @@ import net.rose.customPlugin.item.bow.TricksterBow;
 import net.rose.customPlugin.util.CooldownBars;
 import net.rose.customPlugin.util.Targets;
 import net.rose.customPlugin.util.TrueDamage;
+import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
@@ -14,6 +15,7 @@ import org.bukkit.entity.AbstractArrow;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Tameable;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -30,10 +32,13 @@ import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -49,9 +54,13 @@ public final class TricksterBowListener implements Listener {
     private static final double BOUNCE_RANGE = 4.0;               // next target must be within 4 blocks of the one just hit
     private static final double BOUNCE_SPEED = 2.5;
     private static final double BOUNCE_START_OFFSET = 0.9;   // spawn clear of the player that was just hit
-    private static final double ARROW_DROP_COMPENSATION = 0.012;
 
     private static final int HOMING_TICKS = 30;             // bounced arrows steer onto their target so moving players still get hit
+
+    // Aim assist for primed arrows: a target within ASSIST_RAY_SIZE of an arrow's line gets steered onto.
+    private static final double ASSIST_RANGE = 30.0;
+    private static final double ASSIST_RAY_SIZE = 1.2;
+    private static final int ASSIST_TICKS = 40;
 
     private static final double SWAP_CHANCE = 0.10;
 
@@ -106,12 +115,20 @@ public final class TricksterBowListener implements Listener {
         tag(main, MAX_BOUNCES, null);
 
         Vector velocity = main.getVelocity();
+        // The fan swings sideways in the shooter's view (around the axis pointing out of the top of their head),
+        // not around the world's Y axis, or it would squash together when they look up or down.
+        Vector forward = shooter.getEyeLocation().getDirection();
+        Vector right = forward.clone().crossProduct(new Vector(0, 1, 0));
+        Vector up = right.lengthSquared() < 1.0E-6 ? new Vector(0, 0, 1) : right.crossProduct(forward).normalize();
+
+        List<Arrow> fan = new ArrayList<>();
+        fan.add(main);
         for (int i = 0; i < EXTRA_ARROWS; i++) {
             double side = i % 2 == 0 ? -1 : 1;
             double angle = Math.toRadians(side * SPREAD_DEGREES * (i / 2 + 1));
-            Vector fanned = velocity.clone().rotateAroundY(angle);
+            Vector fanned = velocity.clone().rotateAroundAxis(up, angle);
 
-            shooter.getWorld().spawn(main.getLocation(), Arrow.class, extra -> {
+            fan.add(shooter.getWorld().spawn(main.getLocation(), Arrow.class, extra -> {
                 extra.setShooter(shooter);
                 extra.setVelocity(fanned);
                 extra.setCritical(main.isCritical());
@@ -119,8 +136,13 @@ public final class TricksterBowListener implements Listener {
                 extra.setFireTicks(main.getFireTicks());
                 extra.setPickupStatus(AbstractArrow.PickupStatus.DISALLOWED);
                 tag(extra, MAX_BOUNCES, null);
-            });
+            }));
         }
+
+        // A tick later, once every arrow is in the world, each one is steered onto whoever it is flying at.
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            for (Arrow arrow : fan) assist(shooter, arrow);
+        });
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -132,7 +154,14 @@ public final class TricksterBowListener implements Listener {
         if (bounces == null) return;
 
         if (!(event.getHitEntity() instanceof LivingEntity victim)) return;
-        if (!(arrow.getShooter() instanceof Player shooter) || !Targets.isValidTarget(shooter, victim)) return;
+        if (!(arrow.getShooter() instanceof Player shooter)) return;
+
+        // The shooter (and their pets) are never hit: a bounced arrow that crosses them just flies on.
+        if (victim.equals(shooter) || (victim instanceof Tameable pet && shooter.getUniqueId().equals(pet.getOwnerUniqueId()))) {
+            if (data.has(primedKey, PersistentDataType.BYTE)) event.setCancelled(true);
+            return;
+        }
+        if (!Targets.isValidTarget(shooter, victim)) return;
 
         // Everyone this arrow's chain has already hit. A bounced arrow flies through all of them.
         Set<UUID> alreadyHit = hitBy(arrow);
@@ -141,6 +170,10 @@ public final class TricksterBowListener implements Listener {
             return;
         }
         alreadyHit.add(victim.getUniqueId());
+
+        // Three arrows (and their bounces) often land on the same target within a few ticks, and vanilla's hit
+        // immunity throws away every one after the first. Primed arrows each get to hurt.
+        if (data.has(primedKey, PersistentDataType.BYTE)) victim.setNoDamageTicks(0);
 
         // Only players have a hotbar to swap; mobs still get hit and the arrow still bounces on.
         if (victim instanceof Player target && ThreadLocalRandom.current().nextDouble() < SWAP_CHANCE) {
@@ -161,6 +194,10 @@ public final class TricksterBowListener implements Listener {
         if (!(event.getDamager() instanceof Arrow arrow)) return;
         if (!arrow.getPersistentDataContainer().has(primedKey, PersistentDataType.BYTE)) return;
         if (!(event.getEntity() instanceof LivingEntity)) return;
+        if (event.getEntity().equals(arrow.getShooter())) { // never hurt the shooter
+            event.setCancelled(true);
+            return;
+        }
 
         TrueDamage.makeTrue(event);
     }
@@ -203,8 +240,6 @@ public final class TricksterBowListener implements Listener {
         if (distance < 0.1) return;
 
         direction.multiply(1.0 / distance);
-        direction.setY(direction.getY() + distance * ARROW_DROP_COMPENSATION);
-        direction.normalize();
 
         World world = from.getWorld();
         Location spawn = start.clone().add(direction.clone().multiply(BOUNCE_START_OFFSET));
@@ -217,33 +252,61 @@ public final class TricksterBowListener implements Listener {
             arrow.setCritical(critical);
             arrow.setPickupStatus(AbstractArrow.PickupStatus.DISALLOWED);
             tag(arrow, bouncesLeft, alreadyHit);
-            home(arrow, next);
+            home(arrow, next, BOUNCE_SPEED, HOMING_TICKS);
         });
 
         world.playSound(start, Sound.ENTITY_ARROW_SHOOT, 1f, 1.5f);
         world.spawnParticle(Particle.CRIT, start, 12, 0.3, 0.3, 0.3, 0.2);
     }
 
-    /** Steers a bounced arrow onto its target for a short while so it still connects if the target moves. */
-    private void home(Arrow arrow, LivingEntity target) {
+    /**
+     * Steers an arrow onto its target for a short while so it still connects if the target moves. Gravity is
+     * switched off while it homes (the arrow flies dead straight at the target) and back on afterwards.
+     */
+    private void home(Arrow arrow, LivingEntity target, double speed, int maxTicks) {
+        arrow.setGravity(false);
         new BukkitRunnable() {
             private int ticks = 0;
 
             @Override
             public void run() {
                 if (!arrow.isValid() || arrow.isInBlock() || arrow.isOnGround()
-                        || Targets.isGone(target) || ticks++ >= HOMING_TICKS) {
+                        || Targets.isGone(target) || ticks++ >= maxTicks) {
+                    if (arrow.isValid()) arrow.setGravity(true);
                     cancel();
                     return;
                 }
                 Vector toTarget = target.getLocation().add(0, chest(target), 0).toVector()
                         .subtract(arrow.getLocation().toVector());
                 if (toTarget.lengthSquared() < 0.01) return;
-                toTarget.normalize();
-                toTarget.setY(toTarget.getY() + 0.02); // tiny lift to counter drop
-                arrow.setVelocity(toTarget.normalize().multiply(BOUNCE_SPEED));
+                arrow.setVelocity(toTarget.normalize().multiply(speed));
             }
         }.runTaskTimer(plugin, 1L, 1L);
+    }
+
+    /**
+     * Aim assist for a primed arrow: whoever is within a block or so of the line it is flying along (and not behind
+     * a wall) gets the arrow steered onto them, at the speed the arrow was shot at.
+     */
+    private void assist(Player shooter, Arrow arrow) {
+        if (!arrow.isValid() || arrow.isInBlock()) return;
+
+        Vector velocity = arrow.getVelocity();
+        double speed = velocity.length();
+        if (speed < 0.1) return;
+
+        World world = arrow.getWorld();
+        Location from = arrow.getLocation();
+        Vector direction = velocity.clone().normalize();
+
+        RayTraceResult blocks = world.rayTraceBlocks(from, direction, ASSIST_RANGE, FluidCollisionMode.NEVER, true);
+        double reach = blocks == null ? ASSIST_RANGE : blocks.getHitPosition().distance(from.toVector());
+
+        RayTraceResult hit = world.rayTraceEntities(from, direction, reach, ASSIST_RAY_SIZE,
+                e -> Targets.isValidTarget(shooter, e));
+        if (hit != null && hit.getHitEntity() instanceof LivingEntity target) {
+            home(arrow, target, speed, ASSIST_TICKS);
+        }
     }
 
     /** Height to aim at on an entity: about chest level (1.0 for a player). */

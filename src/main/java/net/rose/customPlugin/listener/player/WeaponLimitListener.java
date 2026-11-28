@@ -24,18 +24,24 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 
 /**
  * Caps how many weapons a player can use at once. Every custom weapon in the inventory costs weapon points by tier
- * ({@code weapon-limit} in config.yml, shown to players by /weaponpoints). Slots are counted in order (hotbar,
- * the rest of the inventory, then the offhand) and a weapon that would take the total over
- * {@code weapon-limit.max-points} is disabled: it can't be used for its abilities or to attack.
+ * ({@code weapon-limit} in config.yml, shown to players by /weaponpoints). Weapons are counted oldest first (the
+ * order the player picked them up in), and a weapon that would take the total over
+ * {@code weapon-limit.max-points} is disabled: it can't be used for its abilities or to attack. Only the weapon that
+ * goes over is disabled; the ones the player already had keep working.
  *
  * <p>Everything here runs at LOWEST priority, so the weapon listeners (which skip cancelled events) never see a
  * disabled weapon being used.
@@ -56,6 +62,12 @@ public final class WeaponLimitListener implements Listener {
 
     /** The weapons (by id) each online player was last told are disabled, so a message only goes out on a change. */
     private final Map<UUID, List<String>> notified = new HashMap<>();
+    /**
+     * The weapon ids each player carries, oldest pickup first (a weapon carried twice appears twice). A newly
+     * picked up weapon goes on the end, so it is the one that goes over the limit. Kept in memory only: after a
+     * restart the order starts out as slot order.
+     */
+    private final Map<UUID, List<String>> acquired = new HashMap<>();
     private final BukkitTask checkTask;
 
     public WeaponLimitListener(JavaPlugin plugin, Legendaries legendaries) {
@@ -72,6 +84,7 @@ public final class WeaponLimitListener implements Listener {
     public void shutdown() {
         if (checkTask != null) checkTask.cancel();
         notified.clear();
+        acquired.clear();
     }
 
     // ---- limit logic ----------------------------------------------------------------------------------------------
@@ -122,24 +135,91 @@ public final class WeaponLimitListener implements Listener {
         return maxPoints;
     }
 
-    public Summary summarize(Player player) {
-        List<Carried> carried = new ArrayList<>();
-        boolean limited = enabled && !player.hasPermission(BYPASS_PERMISSION);
+    /** Whether the weapon limit applies to this player at all. */
+    public boolean isLimited(Player player) {
+        return enabled && !player.hasPermission(BYPASS_PERMISSION);
+    }
 
+    public Summary summarize(Player player) {
+        boolean limited = isLimited(player);
+
+        // Every weapon in slot order: hotbar, the rest of the inventory, then the offhand.
         PlayerInventory inventory = player.getInventory();
-        int used = 0;
+        List<Carried> slotOrder = new ArrayList<>();
         for (int slot = 0; slot <= OFFHAND_SLOT; slot++) {
             if (slot >= STORAGE_SLOTS && slot < OFFHAND_SLOT) continue; // armor slots hold no weapons
             ItemStack stack = inventory.getItem(slot);
             Legendaries.Weapon weapon = legendaries.identify(stack);
             if (weapon == null) continue;
-
-            int cost = pointsOf(weapon) * Math.max(1, stack.getAmount());
-            boolean disabled = limited && used + cost > maxPoints;
-            if (!disabled) used += cost;
-            carried.add(new Carried(weapon, slot, cost, disabled));
+            slotOrder.add(new Carried(weapon, slot, pointsOf(weapon) * Math.max(1, stack.getAmount()), false));
         }
-        return new Summary(used, maxPoints, carried);
+
+        // Points are handed out oldest weapon first, so the one that takes the total over the limit is the newest.
+        Map<Carried, Integer> age = pickupOrder(player.getUniqueId(), slotOrder);
+        List<Carried> byAge = new ArrayList<>(slotOrder);
+        byAge.sort(Comparator.comparingInt(age::get));
+
+        Set<Integer> disabledSlots = new HashSet<>();
+        int used = 0;
+        for (Carried carried : byAge) {
+            if (limited && used + carried.cost() > maxPoints) {
+                disabledSlots.add(carried.slot());
+            } else {
+                used += carried.cost();
+            }
+        }
+
+        List<Carried> result = new ArrayList<>();
+        for (Carried carried : slotOrder) {
+            result.add(new Carried(carried.weapon(), carried.slot(), carried.cost(), disabledSlots.contains(carried.slot())));
+        }
+        return new Summary(used, maxPoints, result);
+    }
+
+    /**
+     * Updates the player's pickup order (weapons they no longer carry drop out, new ones go on the end, in slot
+     * order if several showed up at once) and returns each carried weapon's place in it.
+     */
+    private Map<Carried, Integer> pickupOrder(UUID id, List<Carried> slotOrder) {
+        List<String> order = acquired.computeIfAbsent(id, k -> new ArrayList<>());
+
+        Map<String, Integer> carriedCount = new HashMap<>();
+        for (Carried carried : slotOrder) carriedCount.merge(carried.weapon().id(), 1, Integer::sum);
+
+        // Forget what is no longer carried.
+        Map<String, Integer> kept = new HashMap<>();
+        for (Iterator<String> it = order.iterator(); it.hasNext(); ) {
+            String weaponId = it.next();
+            int have = kept.getOrDefault(weaponId, 0);
+            if (have < carriedCount.getOrDefault(weaponId, 0)) {
+                kept.put(weaponId, have + 1);
+            } else {
+                it.remove();
+            }
+        }
+
+        // Whatever is carried beyond what was already known is new.
+        Map<String, Integer> seen = new HashMap<>();
+        for (Carried carried : slotOrder) {
+            String weaponId = carried.weapon().id();
+            if (seen.merge(weaponId, 1, Integer::sum) > kept.getOrDefault(weaponId, 0)) order.add(weaponId);
+        }
+
+        // The n-th copy of a weapon takes the n-th place that weapon holds in the order.
+        Map<String, Integer> nextCopy = new HashMap<>();
+        Map<Carried, Integer> age = new IdentityHashMap<>();
+        for (Carried carried : slotOrder) {
+            int copy = nextCopy.merge(carried.weapon().id(), 1, Integer::sum);
+            int found = 0;
+            for (int i = 0; i < order.size(); i++) {
+                if (order.get(i).equals(carried.weapon().id()) && ++found == copy) {
+                    age.put(carried, i);
+                    break;
+                }
+            }
+        }
+        if (order.isEmpty()) acquired.remove(id);
+        return age;
     }
 
     /** Inventory slot -> weapon, for every weapon the player carries that is over the limit. */

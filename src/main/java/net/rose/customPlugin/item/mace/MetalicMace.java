@@ -27,7 +27,7 @@ public final class MetalicMace {
         meta.displayName(Component.text("Metalic Mace", NamedTextColor.GRAY)
                 .decoration(TextDecoration.ITALIC, false));
         meta.lore(List.of(
-                ability("Offhand", "Pull a player or mob in with a chain"),
+                ability("Offhand", "Pull a player or mob in with a chain, or look at a block to chain yourself to it and pull yourself there"),
                 ability("Chain", "The pulled target is slowed for 8s and can't jump or use wind charges")
         ));
         meta.setItemModel(key); // texture pack model: customplugin:<name>

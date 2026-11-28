@@ -21,10 +21,16 @@ commands:
     permission: customplugin.weaponpack
 
   weaponpoints:
-    description: Open the weapon points menu (every weapon's tier and cost, and how many points you are using)
+    description: Open the weapon points menu (the weapons you carry, what they cost, and how many points you are using)
     usage: /weaponpoints
     aliases: [ wpoints ]
     permission: customplugin.weaponpoints
+
+  shop:
+    description: Open the weapon shop (buy weapons with kill tokens)
+    usage: /shop
+    aliases: [ weaponshop ]
+    permission: customplugin.shop
 
 permissions:
   customplugin.weapon:
@@ -38,6 +44,9 @@ permissions:
     default: op
   customplugin.weaponpoints:
     description: Allows /weaponpoints
+    default: true
+  customplugin.shop:
+    description: Allows /shop
     default: true
   customplugin.weaponlimit.bypass:
     description: Not affected by the weapon limit (weapon-limit in config.yml)

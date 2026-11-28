@@ -40,6 +40,13 @@ public final class MetalicMaceListener implements Listener {
     private static final int PULL_MAX_TICKS = 12;
     private static final long PULL_COOLDOWN_MS = 25_000;
 
+    private static final int GRAPPLE_RANGE = 30;            // how far away a block can be to grapple to it
+    private static final double GRAPPLE_SPEED = 1.0;        // blocks per tick
+    private static final double GRAPPLE_STOP_DISTANCE = 1.6; // from the middle of the player to the point
+    private static final int GRAPPLE_MAX_TICKS = 40;
+    private static final int GRAPPLE_STUCK_TICKS = 4;       // no progress for this long (blocked) ends the pull
+    private static final double GRAPPLE_EXIT_SPEED = 0.3;   // fraction of the pull's speed kept when it ends
+
     private static final String PULL_ID = "chain_pull";
 
     private final JavaPlugin plugin;
@@ -54,7 +61,10 @@ public final class MetalicMaceListener implements Listener {
         this.chains = chains;
     }
 
-    /** Offhand key (F) while holding the Metalic Mace pulls the player you're looking at. The swap itself is always cancelled. */
+    /**
+     * Offhand key (F) while holding the Metalic Mace pulls the player or mob you're looking at, or, if you aren't
+     * looking at one, chains you to the block you're looking at and pulls you to it. The swap itself is always cancelled.
+     */
     @EventHandler(ignoreCancelled = true)
     public void onSwapHand(PlayerSwapHandItemsEvent event) {
         Player player = event.getPlayer();
@@ -131,11 +141,82 @@ public final class MetalicMaceListener implements Listener {
         if (cooldowns.isOnCooldown(player, PULL_ID)) return; // boss bar already shows the time left
 
         LivingEntity target = findTarget(player);
-        if (target == null) {
-            player.sendActionBar(Component.text("Look at a target to use Chain Pull", NamedTextColor.RED));
+        if (target != null) {
+            pullTarget(player, target);
             return;
         }
 
+        RayTraceResult anchor = findAnchor(player);
+        if (anchor == null) {
+            player.sendActionBar(Component.text("Look at a target or a block to use Chain Pull", NamedTextColor.RED));
+            return;
+        }
+        grapple(player, anchor);
+    }
+
+    /** The block the player is looking at (fluids and passable blocks are skipped), or null if it is out of range. */
+    private RayTraceResult findAnchor(Player player) {
+        RayTraceResult hit = player.getWorld().rayTraceBlocks(player.getEyeLocation(), player.getEyeLocation().getDirection(),
+                GRAPPLE_RANGE, FluidCollisionMode.NEVER, true);
+        return hit == null || hit.getHitBlock() == null ? null : hit;
+    }
+
+    /** Chains the player to a block and drags them to it. */
+    private void grapple(Player player, RayTraceResult anchor) {
+        // A touch off the surface so a floor point is above the floor and a wall point is in front of the wall.
+        Vector normal = anchor.getHitBlockFace() == null ? new Vector() : anchor.getHitBlockFace().getDirection();
+        Location point = anchor.getHitPosition().add(normal.multiply(0.1)).toLocation(player.getWorld());
+
+        Location middleNow = player.getLocation().add(0, player.getHeight() * 0.5, 0);
+        if (middleNow.distance(point) <= GRAPPLE_STOP_DISTANCE + 1.0) {
+            player.sendActionBar(Component.text("Too close to chain to", NamedTextColor.RED)); // no cooldown spent
+            return;
+        }
+
+        cooldowns.start(player, PULL_ID, "Chain Pull", BossBar.Color.PURPLE, PULL_COOLDOWN_MS);
+        player.getWorld().playSound(player.getLocation(), Sound.ENTITY_IRON_GOLEM_ATTACK, 1f, 0.8f);
+        player.getWorld().playSound(point, Sound.BLOCK_ANVIL_LAND, 0.6f, 1.2f);
+
+        ChainEffects.Link link = chains.createLink();
+
+        new BukkitRunnable() {
+            private int ticks = 0;
+            private int stuck = 0;
+            private double lastDistance = Double.MAX_VALUE;
+
+            @Override
+            public void run() {
+                if (!player.isOnline() || player.isDead() || !player.getWorld().equals(point.getWorld())) {
+                    link.remove();
+                    cancel();
+                    return;
+                }
+
+                Location middle = player.getLocation().add(0, player.getHeight() * 0.5, 0);
+                double distance = middle.distance(point);
+
+                stuck = distance < lastDistance - 0.05 ? 0 : stuck + 1;
+                lastDistance = distance;
+
+                if (distance <= GRAPPLE_STOP_DISTANCE || stuck >= GRAPPLE_STUCK_TICKS || ticks >= GRAPPLE_MAX_TICKS) {
+                    player.setVelocity(player.getVelocity().multiply(GRAPPLE_EXIT_SPEED));
+                    link.remove();
+                    cancel();
+                    return;
+                }
+
+                Location hand = player.getEyeLocation().subtract(0, 0.4, 0);
+                link.update(hand, point);
+
+                Vector toward = point.toVector().subtract(middle.toVector()).normalize();
+                player.setVelocity(toward.multiply(GRAPPLE_SPEED));
+                player.setFallDistance(0f); // the pull itself never causes fall damage
+                ticks++;
+            }
+        }.runTaskTimer(plugin, 0L, 1L);
+    }
+
+    private void pullTarget(Player player, LivingEntity target) {
         cooldowns.start(player, PULL_ID, "Chain Pull", BossBar.Color.PURPLE, PULL_COOLDOWN_MS);
         player.getWorld().playSound(player.getLocation(), Sound.ENTITY_IRON_GOLEM_ATTACK, 1f, 0.8f);
 
