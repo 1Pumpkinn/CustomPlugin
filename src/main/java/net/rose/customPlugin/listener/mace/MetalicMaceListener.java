@@ -1,5 +1,6 @@
 package net.rose.customPlugin.listener.mace;
 
+import net.rose.customPlugin.util.Aim;
 import net.rose.customPlugin.api.WeaponContext;
 import net.rose.customPlugin.api.AbilityListener;
 import net.kyori.adventure.bossbar.BossBar;
@@ -23,7 +24,6 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
-import java.util.Comparator;
 
 public final class MetalicMaceListener extends AbilityListener<MetalicMace> {
 
@@ -83,44 +83,10 @@ public final class MetalicMaceListener extends AbilityListener<MetalicMace> {
         chains.clear(player);
     }
 
-    /**
-     * Forgiving aim: first a wide ray along the crosshair (stopped by walls), then, if that finds nothing,
-     * the target closest to the crosshair inside a cone (it must be in line of sight).
-     */
-    private LivingEntity findTarget(Player player) {
-        Location eye = player.getEyeLocation();
-        Vector direction = eye.getDirection();
-
-        RayTraceResult blocks = player.getWorld().rayTraceBlocks(
-                eye, direction, PULL_RANGE, FluidCollisionMode.NEVER, true);
-        double reach = blocks == null ? PULL_RANGE : blocks.getHitPosition().distance(eye.toVector());
-
-        RayTraceResult hit = player.getWorld().rayTraceEntities(eye, direction, reach, AIM_RAY_SIZE,
-                e -> Targets.isValidTarget(player, e));
-        if (hit != null && hit.getHitEntity() instanceof LivingEntity living) return living;
-
-        double minDot = Math.cos(Math.toRadians(AIM_CONE_DEGREES));
-        return player.getWorld().getNearbyLivingEntities(eye, PULL_RANGE).stream()
-                .filter(e -> Targets.isValidTarget(player, e))
-                .filter(e -> {
-                    Vector toTarget = e.getLocation().add(0, e.getHeight() * 0.5, 0).toVector().subtract(eye.toVector());
-                    double length = toTarget.length();
-                    return length > 0.1 && length <= PULL_RANGE && toTarget.multiply(1.0 / length).dot(direction) >= minDot;
-                })
-                .filter(player::hasLineOfSight)
-                .min(Comparator.comparingDouble(e -> -aimDot(eye, direction, e)))
-                .orElse(null);
-    }
-
-    private static double aimDot(Location eye, Vector direction, LivingEntity entity) {
-        Vector toTarget = entity.getLocation().add(0, entity.getHeight() * 0.5, 0).toVector().subtract(eye.toVector());
-        return toTarget.normalize().dot(direction);
-    }
-
     private void pull(Player player) {
         if (cooldowns.isOnCooldown(player, PULL_ID)) return; // boss bar already shows the time left
 
-        LivingEntity target = findTarget(player);
+        LivingEntity target = Aim.lookedAtOrNear(player, PULL_RANGE, AIM_RAY_SIZE, AIM_CONE_DEGREES);
         if (target != null) {
             pullTarget(player, target);
             return;

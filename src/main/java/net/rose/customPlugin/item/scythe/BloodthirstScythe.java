@@ -29,6 +29,14 @@ public final class BloodthirstScythe extends CustomWeapon {
     }
 
     @Override
+    public List<String> deathMessages() {
+        return List.of(
+                "<victim> was drained dry by <killer>'s <weapon>",
+                "<killer> swept <victim> away with the <weapon>",
+                "<victim> fed <killer>'s <weapon>");
+    }
+
+    @Override
     public Listener createListener(WeaponContext context) {
         return new BloodthirstScytheListener(context, this, new VampireSweepEffect(context.deaths()));
     }

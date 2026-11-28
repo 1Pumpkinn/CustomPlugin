@@ -79,6 +79,16 @@ public abstract class CustomWeapon {
         return 32;
     }
 
+    /**
+     * Death messages for players killed by this weapon's abilities, one picked at random. They use the placeholders
+     * {@code <victim>}, {@code <killer>} and {@code <weapon>}. Abilities call
+     * {@code deaths.mark(victim, killer, weapon.key().getKey())} right before they deal damage. Empty (the default)
+     * means the generic "killed by X using Y" message.
+     */
+    public List<String> deathMessages() {
+        return List.of();
+    }
+
     /** Whether new copies come fully enchanted, like every other weapon. */
     protected boolean maxEnchanted() {
         return true;

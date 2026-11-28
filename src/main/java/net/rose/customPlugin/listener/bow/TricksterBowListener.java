@@ -1,17 +1,15 @@
 package net.rose.customPlugin.listener.bow;
 
+import net.rose.customPlugin.effect.ArrowBounce;
+import net.rose.customPlugin.util.ArrowHoming;
+import net.rose.customPlugin.api.PrimedAbility;
 import net.rose.customPlugin.api.WeaponContext;
 import net.rose.customPlugin.api.AbilityListener;
 import net.kyori.adventure.bossbar.BossBar;
 import net.rose.customPlugin.item.bow.TricksterBow;
 import net.rose.customPlugin.util.Targets;
 import net.rose.customPlugin.util.TrueDamage;
-import org.bukkit.FluidCollisionMode;
-import org.bukkit.Location;
-import org.bukkit.NamespacedKey;
-import org.bukkit.Particle;
 import org.bukkit.Sound;
-import org.bukkit.World;
 import org.bukkit.entity.AbstractArrow;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.LivingEntity;
@@ -22,22 +20,14 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
-import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
-import org.bukkit.persistence.PersistentDataContainer;
-import org.bukkit.persistence.PersistentDataType;
-import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import java.util.concurrent.ThreadLocalRandom;
 
 public final class TricksterBowListener extends AbilityListener<TricksterBow> {
@@ -47,11 +37,6 @@ public final class TricksterBowListener extends AbilityListener<TricksterBow> {
     private static final double DAMAGE_MULTIPLIER = 1.5;
 
     private static final int MAX_BOUNCES = 3;                // per arrow
-    private static final double BOUNCE_RANGE = 4.0;               // next target must be within 4 blocks of the one just hit
-    private static final double BOUNCE_SPEED = 2.5;
-    private static final double BOUNCE_START_OFFSET = 0.9;   // spawn clear of the player that was just hit
-
-    private static final int HOMING_TICKS = 30;             // bounced arrows steer onto their target so moving players still get hit
 
     // Aim assist for primed arrows: a target within ASSIST_RAY_SIZE of an arrow's line gets steered onto.
     private static final double ASSIST_RANGE = 30.0;
@@ -61,24 +46,22 @@ public final class TricksterBowListener extends AbilityListener<TricksterBow> {
     private static final double SWAP_CHANCE = 0.10;
 
     private static final long SHOT_COOLDOWN_MS = 15_000;
-    private static final String SHOT_ID = "trickster_shot";
 
-    private final Set<UUID> armed = new HashSet<>();
-    private final NamespacedKey bouncesKey;
-    private final NamespacedKey hitKey;
-    private final NamespacedKey primedKey;
+    private final PrimedAbility shot;
+    private final ArrowBounce arrows;
+    private final ArrowHoming homing;
 
     public TricksterBowListener(WeaponContext context, TricksterBow bow) {
         super(context, bow);
-        this.bouncesKey = key("trickster_bounces");
-        this.hitKey = key("trickster_hit");
-        this.primedKey = key("trickster_primed");
+        this.shot = primedAbility("trickster_shot", "Trickster Shot", BossBar.Color.PURPLE, SHOT_COOLDOWN_MS);
+        this.homing = new ArrowHoming(plugin);
+        this.arrows = new ArrowBounce(plugin, homing);
     }
 
     /** Offhand key (F) while holding the Trickster Bow primes the next shot. The swap itself is always cancelled. */
     @Override
     protected void onOffhand(Player player, boolean sneaking) {
-        prime(player);
+        if (shot.prime(player)) player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1.6f);
     }
 
     /**
@@ -91,15 +74,13 @@ public final class TricksterBowListener extends AbilityListener<TricksterBow> {
         if (!weapon.isWeapon(event.getBow())) return;
         if (!(event.getProjectile() instanceof Arrow main)) return;
 
-        if (!armed.remove(shooter.getUniqueId())) {
-            tag(main, 0, null); // not primed: no fan, no bounce, but the hotbar passive still rolls
+        if (!shot.spend(shooter)) {
+            arrows.tag(main, 0, null); // not primed: no fan, no bounce, but the hotbar passive still rolls
             return;
         }
-        cooldowns.unprime(shooter, SHOT_ID);
-        cooldowns.start(shooter, SHOT_ID, "Trickster Shot", BossBar.Color.PURPLE, SHOT_COOLDOWN_MS);
 
         main.setDamage(main.getDamage() * DAMAGE_MULTIPLIER);
-        tag(main, MAX_BOUNCES, null);
+        arrows.tag(main, MAX_BOUNCES, null);
 
         Vector velocity = main.getVelocity();
         // The fan swings sideways in the shooter's view (around the axis pointing out of the top of their head),
@@ -122,13 +103,13 @@ public final class TricksterBowListener extends AbilityListener<TricksterBow> {
                 extra.setDamage(main.getDamage());
                 extra.setFireTicks(main.getFireTicks());
                 extra.setPickupStatus(AbstractArrow.PickupStatus.DISALLOWED);
-                tag(extra, MAX_BOUNCES, null);
+                arrows.tag(extra, MAX_BOUNCES, null);
             }));
         }
 
         // A tick later, once every arrow is in the world, each one is steered onto whoever it is flying at.
         plugin.getServer().getScheduler().runTask(plugin, () -> {
-            for (Arrow arrow : fan) assist(shooter, arrow);
+            for (Arrow arrow : fan) homing.assist(shooter, arrow, ASSIST_RANGE, ASSIST_RAY_SIZE, ASSIST_TICKS);
         });
     }
 
@@ -136,8 +117,7 @@ public final class TricksterBowListener extends AbilityListener<TricksterBow> {
     public void onHit(ProjectileHitEvent event) {
         if (!(event.getEntity() instanceof Arrow arrow)) return;
 
-        PersistentDataContainer data = arrow.getPersistentDataContainer();
-        Integer bounces = data.get(bouncesKey, PersistentDataType.INTEGER);
+        Integer bounces = arrows.bouncesLeft(arrow);
         if (bounces == null) return;
 
         if (!(event.getHitEntity() instanceof LivingEntity victim)) return;
@@ -145,13 +125,13 @@ public final class TricksterBowListener extends AbilityListener<TricksterBow> {
 
         // The shooter (and their pets) are never hit: a bounced arrow that crosses them just flies on.
         if (victim.equals(shooter) || (victim instanceof Tameable pet && shooter.getUniqueId().equals(pet.getOwnerUniqueId()))) {
-            if (data.has(primedKey, PersistentDataType.BYTE)) event.setCancelled(true);
+            if (arrows.isPrimed(arrow)) event.setCancelled(true);
             return;
         }
         if (!Targets.isValidTarget(shooter, victim)) return;
 
         // Everyone this arrow's chain has already hit. A bounced arrow flies through all of them.
-        Set<UUID> alreadyHit = hitBy(arrow);
+        Set<UUID> alreadyHit = arrows.hitBy(arrow);
         if (alreadyHit.contains(victim.getUniqueId())) {
             event.setCancelled(true);
             return;
@@ -160,7 +140,7 @@ public final class TricksterBowListener extends AbilityListener<TricksterBow> {
 
         // Three arrows (and their bounces) often land on the same target within a few ticks, and vanilla's hit
         // immunity throws away every one after the first. Primed arrows each get to hurt.
-        if (data.has(primedKey, PersistentDataType.BYTE)) victim.setNoDamageTicks(0);
+        if (arrows.isPrimed(arrow)) victim.setNoDamageTicks(0);
 
         // Only players have a hotbar to swap; mobs still get hit and the arrow still bounces on.
         if (victim instanceof Player target && ThreadLocalRandom.current().nextDouble() < SWAP_CHANCE) {
@@ -170,8 +150,7 @@ public final class TricksterBowListener extends AbilityListener<TricksterBow> {
         if (bounces > 0) {
             double damage = arrow.getDamage();
             boolean critical = arrow.isCritical();
-            plugin.getServer().getScheduler().runTask(plugin,
-                    () -> bounce(shooter, victim, bounces - 1, damage, critical, alreadyHit));
+            arrows.bounceNextTick(shooter, victim, bounces - 1, damage, critical, alreadyHit);
         }
     }
 
@@ -179,7 +158,7 @@ public final class TricksterBowListener extends AbilityListener<TricksterBow> {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onArrowDamage(EntityDamageByEntityEvent event) {
         if (!(event.getDamager() instanceof Arrow arrow)) return;
-        if (!arrow.getPersistentDataContainer().has(primedKey, PersistentDataType.BYTE)) return;
+        if (!arrows.isPrimed(arrow)) return;
         if (!(event.getEntity() instanceof LivingEntity)) return;
         if (event.getEntity().equals(arrow.getShooter())) { // never hurt the shooter
             event.setCancelled(true);
@@ -187,157 +166,6 @@ public final class TricksterBowListener extends AbilityListener<TricksterBow> {
         }
 
         TrueDamage.makeTrue(event);
-    }
-
-    /** Dropping the weapon cancels a primed ability, so its boss bar doesn't stay behind. */
-    @EventHandler(ignoreCancelled = true)
-    public void onDrop(PlayerDropItemEvent event) {
-        if (!weapon.isWeapon(event.getItemDrop().getItemStack())) return;
-        Player player = event.getPlayer();
-        if (armed.remove(player.getUniqueId())) cooldowns.unprime(player, SHOT_ID);
-    }
-
-    @Override
-    protected void onPlayerDeath(Player player) {
-        armed.remove(player.getUniqueId());
-        cooldowns.unprime(player, SHOT_ID);
-    }
-
-    @Override
-    protected void onPlayerQuit(Player player) {
-        armed.remove(player.getUniqueId());
-    }
-
-    private void prime(Player player) {
-        if (cooldowns.isOnCooldown(player, SHOT_ID)) return; // boss bar already shows the time left
-        if (!armed.add(player.getUniqueId())) return;
-        cooldowns.prime(player, SHOT_ID, "Trickster Shot", BossBar.Color.PURPLE);
-        player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1.6f);
-    }
-
-    private void bounce(Player shooter, LivingEntity from, int bouncesLeft, double damage, boolean critical,
-                        Set<UUID> alreadyHit) {
-        if (!shooter.isOnline() || !from.isValid()) return;
-
-        LivingEntity next = nearestTarget(shooter, from, alreadyHit);
-        if (next == null) return;
-
-        Location start = from.getLocation().add(0, chest(from), 0);
-        Vector direction = next.getLocation().add(0, chest(next), 0).toVector().subtract(start.toVector());
-        double distance = direction.length();
-        if (distance < 0.1) return;
-
-        direction.multiply(1.0 / distance);
-
-        World world = from.getWorld();
-        Location spawn = start.clone().add(direction.clone().multiply(BOUNCE_START_OFFSET));
-        Vector velocity = direction.multiply(BOUNCE_SPEED);
-
-        world.spawn(spawn, Arrow.class, arrow -> {
-            arrow.setShooter(shooter);
-            arrow.setVelocity(velocity);
-            arrow.setDamage(damage);
-            arrow.setCritical(critical);
-            arrow.setPickupStatus(AbstractArrow.PickupStatus.DISALLOWED);
-            tag(arrow, bouncesLeft, alreadyHit);
-            home(arrow, next, BOUNCE_SPEED, HOMING_TICKS);
-        });
-
-        world.playSound(start, Sound.ENTITY_ARROW_SHOOT, 1f, 1.5f);
-        world.spawnParticle(Particle.CRIT, start, 12, 0.3, 0.3, 0.3, 0.2);
-    }
-
-    /**
-     * Steers an arrow onto its target for a short while so it still connects if the target moves. Gravity is
-     * switched off while it homes (the arrow flies dead straight at the target) and back on afterwards.
-     */
-    private void home(Arrow arrow, LivingEntity target, double speed, int maxTicks) {
-        arrow.setGravity(false);
-        new BukkitRunnable() {
-            private int ticks = 0;
-
-            @Override
-            public void run() {
-                if (!arrow.isValid() || arrow.isInBlock() || arrow.isOnGround()
-                        || Targets.isGone(target) || ticks++ >= maxTicks) {
-                    if (arrow.isValid()) arrow.setGravity(true);
-                    cancel();
-                    return;
-                }
-                Vector toTarget = target.getLocation().add(0, chest(target), 0).toVector()
-                        .subtract(arrow.getLocation().toVector());
-                if (toTarget.lengthSquared() < 0.01) return;
-                arrow.setVelocity(toTarget.normalize().multiply(speed));
-            }
-        }.runTaskTimer(plugin, 1L, 1L);
-    }
-
-    /**
-     * Aim assist for a primed arrow: whoever is within a block or so of the line it is flying along (and not behind
-     * a wall) gets the arrow steered onto them, at the speed the arrow was shot at.
-     */
-    private void assist(Player shooter, Arrow arrow) {
-        if (!arrow.isValid() || arrow.isInBlock()) return;
-
-        Vector velocity = arrow.getVelocity();
-        double speed = velocity.length();
-        if (speed < 0.1) return;
-
-        World world = arrow.getWorld();
-        Location from = arrow.getLocation();
-        Vector direction = velocity.clone().normalize();
-
-        RayTraceResult blocks = world.rayTraceBlocks(from, direction, ASSIST_RANGE, FluidCollisionMode.NEVER, true);
-        double reach = blocks == null ? ASSIST_RANGE : blocks.getHitPosition().distance(from.toVector());
-
-        RayTraceResult hit = world.rayTraceEntities(from, direction, reach, ASSIST_RAY_SIZE,
-                e -> Targets.isValidTarget(shooter, e));
-        if (hit != null && hit.getHitEntity() instanceof LivingEntity target) {
-            home(arrow, target, speed, ASSIST_TICKS);
-        }
-    }
-
-    /** Height to aim at on an entity: about chest level (1.0 for a player). */
-    private static double chest(LivingEntity entity) {
-        return entity.getHeight() * 0.55;
-    }
-
-    /** Closest target, player or mob (not the shooter, not anyone this arrow already hit), within range and in line of sight. */
-    private LivingEntity nearestTarget(Player shooter, LivingEntity from, Set<UUID> alreadyHit) {
-        LivingEntity best = null;
-        double bestDistance = BOUNCE_RANGE * BOUNCE_RANGE;
-        for (LivingEntity candidate : from.getWorld().getNearbyLivingEntities(from.getLocation(), BOUNCE_RANGE)) {
-            if (alreadyHit.contains(candidate.getUniqueId()) || !Targets.isValidTarget(shooter, candidate)) continue;
-
-            double distance = from.getLocation().distanceSquared(candidate.getLocation());
-            if (distance > bestDistance || !from.hasLineOfSight(candidate)) continue;
-
-            best = candidate;
-            bestDistance = distance;
-        }
-        return best;
-    }
-
-    private void tag(Arrow arrow, int bounces, Set<UUID> alreadyHit) {
-        PersistentDataContainer data = arrow.getPersistentDataContainer();
-        data.set(bouncesKey, PersistentDataType.INTEGER, bounces);
-        if (bounces > 0 || (alreadyHit != null && !alreadyHit.isEmpty())) {
-            data.set(primedKey, PersistentDataType.BYTE, (byte) 1); // part of the primed ability (fan or bounce)
-        }
-        if (alreadyHit != null && !alreadyHit.isEmpty()) {
-            data.set(hitKey, PersistentDataType.STRING,
-                    alreadyHit.stream().map(UUID::toString).collect(Collectors.joining(",")));
-        }
-    }
-
-    /** The targets this arrow's bounce chain has already hit (a fresh, mutable set). */
-    private Set<UUID> hitBy(Arrow arrow) {
-        Set<UUID> hit = new HashSet<>();
-        String stored = arrow.getPersistentDataContainer().get(hitKey, PersistentDataType.STRING);
-        if (stored != null && !stored.isEmpty()) {
-            Arrays.stream(stored.split(",")).map(UUID::fromString).forEach(hit::add);
-        }
-        return hit;
     }
 
     /** Passive: the slot the hit player is holding trades places with one other hotbar slot. Nothing else moves. */

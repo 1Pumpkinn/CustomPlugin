@@ -1,5 +1,6 @@
 package net.rose.customPlugin.listener.sword;
 
+import net.rose.customPlugin.api.PrimedAbility;
 import net.rose.customPlugin.api.WeaponContext;
 import net.rose.customPlugin.api.AbilityListener;
 import net.kyori.adventure.bossbar.BossBar;
@@ -15,14 +16,11 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 public final class TideBladeListener extends AbilityListener<TideBlade> {
@@ -34,22 +32,21 @@ public final class TideBladeListener extends AbilityListener<TideBlade> {
     private static final double DROWN_DAMAGE = 1.5;          // 5 ticks of damage = 7.5 HP total
     private static final long DROWN_COOLDOWN_MS = 30_000;
 
-    private static final String DROWN_ID = "drown";
-
     private final DeathMessages deaths;
+    private final PrimedAbility drown;
 
-    private final Set<UUID> armed = new HashSet<>();
     private final Map<UUID, BukkitTask> drowning = new HashMap<>();
 
     public TideBladeListener(WeaponContext context, TideBlade tideBlade) {
         super(context, tideBlade);
         this.deaths = context.deaths();
+        this.drown = primedAbility("drown", "Drown", BossBar.Color.BLUE, DROWN_COOLDOWN_MS);
     }
 
     /** Offhand key (F) while holding the Tide Blade: arms Drown. */
     @Override
     protected void onOffhand(Player player, boolean sneaking) {
-        armDrown(player);
+        if (drown.prime(player)) player.playSound(player.getLocation(), Sound.ENTITY_GENERIC_SPLASH, 1f, 0.8f);
     }
 
     /** The next target (player or mob) hit with the Tide Blade while armed starts drowning. */
@@ -58,43 +55,19 @@ public final class TideBladeListener extends AbilityListener<TideBlade> {
         if (!(event.getDamager() instanceof Player attacker)) return;
         if (!Targets.isValidTarget(attacker, event.getEntity())) return;
         LivingEntity victim = (LivingEntity) event.getEntity();
-        if (!armed.contains(attacker.getUniqueId())) return;
+        if (!drown.isPrimed(attacker)) return;
         if (!weapon.isWeapon(attacker.getInventory().getItemInMainHand())) return;
 
-        armed.remove(attacker.getUniqueId());
-        cooldowns.unprime(attacker, DROWN_ID);
-        cooldowns.start(attacker, DROWN_ID, "Drown", BossBar.Color.BLUE, DROWN_COOLDOWN_MS);
+        drown.spend(attacker);
         startDrowning(attacker, victim);
-    }
-
-    /** Dropping the weapon cancels a primed ability, so its boss bar doesn't stay behind. */
-    @EventHandler(ignoreCancelled = true)
-    public void onDrop(PlayerDropItemEvent event) {
-        if (!weapon.isWeapon(event.getItemDrop().getItemStack())) return;
-        Player player = event.getPlayer();
-        if (armed.remove(player.getUniqueId())) cooldowns.unprime(player, DROWN_ID);
-    }
-
-    @Override
-    protected void onPlayerDeath(Player player) {
-        armed.remove(player.getUniqueId());
-        cooldowns.unprime(player, DROWN_ID);
     }
 
     @Override
     protected void onPlayerQuit(Player player) {
-        armed.remove(player.getUniqueId());
         stopDrowning(player);
     }
 
     // ------------------------------------------------------------------ Drown
-
-    private void armDrown(Player player) {
-        if (cooldowns.isOnCooldown(player, DROWN_ID)) return; // boss bar already shows the time left
-        if (!armed.add(player.getUniqueId())) return;
-        cooldowns.prime(player, DROWN_ID, "Drown", BossBar.Color.BLUE);
-        player.playSound(player.getLocation(), Sound.ENTITY_GENERIC_SPLASH, 1f, 0.8f);
-    }
 
     private void startDrowning(Player attacker, LivingEntity victim) {
         stopDrowning(victim);

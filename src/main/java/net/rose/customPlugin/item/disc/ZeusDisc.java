@@ -35,6 +35,14 @@ public final class ZeusDisc extends CustomWeapon {
     }
 
     @Override
+    public List<String> deathMessages() {
+        return List.of(
+                "<victim> was struck down by <killer>'s <weapon>",
+                "<killer> smote <victim> with the <weapon>",
+                "<victim> was fried by <killer>'s lightning");
+    }
+
+    @Override
     public Listener createListener(WeaponContext context) {
         this.listener = new ZeusDiscListener(context, this, new ZeusLightning(plugin, context.deaths()));
         return listener;

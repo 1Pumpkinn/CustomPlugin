@@ -37,6 +37,14 @@ public final class VolcanicAxe extends CustomWeapon {
     }
 
     @Override
+    public List<String> deathMessages() {
+        return List.of(
+                "<victim> was incinerated by <killer>'s <weapon>",
+                "<killer> erupted <victim> into ash with the <weapon>",
+                "<victim> got too close to <killer>'s volcano");
+    }
+
+    @Override
     public Listener createListener(WeaponContext context) {
         this.eruption = new EruptionEffect(plugin, context.deaths());
         this.spin = new AxeSpinEffect(plugin, context.deaths());

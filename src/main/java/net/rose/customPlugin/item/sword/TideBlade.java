@@ -24,6 +24,14 @@ public final class TideBlade extends CustomWeapon {
     }
 
     @Override
+    public List<String> deathMessages() {
+        return List.of(
+                "<victim> was dragged under by <killer>'s <weapon>",
+                "<killer> drowned <victim> with the <weapon>",
+                "<victim> forgot how to breathe thanks to <killer>");
+    }
+
+    @Override
     public Listener createListener(WeaponContext context) {
         return new TideBladeListener(context, this);
     }

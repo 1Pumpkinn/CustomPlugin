@@ -31,6 +31,14 @@ public final class FrostSpear extends CustomWeapon {
     }
 
     @Override
+    public List<String> deathMessages() {
+        return List.of(
+                "<victim> was frozen solid by <killer>'s <weapon>",
+                "<killer> left <victim> out in the cold with the <weapon>",
+                "<victim> shattered into ice shards courtesy of <killer>");
+    }
+
+    @Override
     public Listener createListener(WeaponContext context) {
         return new FrostSpearListener(context, this, frost);
     }

@@ -50,6 +50,7 @@ public final class WeaponManager {
         }
 
         legendaries.register(weapon.key(), id, weapon.displayName(), weapon.color());
+        context.deaths().register(weapon.key().getKey(), weapon.displayName(), weapon.color(), weapon.deathMessages());
         registry.register(id, weapon::create);
         addConfigDefaults(weapon);
 

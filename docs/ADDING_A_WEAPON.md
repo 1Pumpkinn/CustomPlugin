@@ -41,6 +41,7 @@ public final class MyBow extends CustomWeapon {
 | `finish(ItemStack)`            | Runs on the finished item, for what the meta can't reach (data components such as `JUKEBOX_PLAYABLE`). |
 | `maxEnchanted()`               | `false` to skip the automatic max enchants.                                   |
 | `skippedEnchants()`            | Enchantment keys the automatic max enchants leave off (e.g. `Set.of("fire_aspect")`). |
+| `deathMessages()`              | Death messages for ability kills (`<victim>`, `<killer>`, `<weapon>`); empty = the generic one. Abilities call `deaths.mark(victim, killer, weapon.key().getKey())`. |
 | `onDisable()`                  | End anything the weapon keeps running (displays, tasks, effects).             |
 | `isWeapon(ItemStack)`          | Is this stack your weapon? Null-safe.                                         |
 
@@ -81,6 +82,21 @@ The base class already handles: the offhand key, restoring cooldown boss bars on
 Helpers: `key(name)` (a namespaced key for tagging arrows or entities), `ready(player, id)`,
 `startCooldown(...)`. `cooldowns` (primed bars: `prime / updatePrimed / unprime`), `plugin` and `weapon` are fields.
 
+### Helpers in the API
+
+Reach for these before writing the same thing again:
+
+| Class              | What it does                                                                                    |
+|--------------------|-------------------------------------------------------------------------------------------------|
+| `PrimedAbility`    | "Press F to arm, the next hit/shot/throw spends it, then a cooldown": the armed set and the boss bar. Make one with `primedAbility(...)` in your listener's constructor and the base class cancels it on drop and death and forgets it on quit. `prime` / `spend`; `consume` + `startCooldown` / `restore` when the action can fail. |
+| `RightClick`       | `isUse(event)` and `yieldsToBlock(event)` for right-click handlers (chests and doors keep working). |
+| `HeldWeapon`       | Take the weapon out of a hand to throw it, and put it back if the throw fails.                  |
+| `Aim` (util)       | `lookedAt`, `lookedAtOrNear` and `firstTarget`: who the player or an arrow is aiming at.        |
+| `ArrowHoming` (util) | Steer an arrow onto a target, or assist its aim.                                              |
+| `DiscFlights` (effect) | The discs in the air, one per player, for throw-and-return weapons.                         |
+
+Hooks on `AbilityListener` besides `onOffhand`: `onPlayerJoin`, `onWeaponDropped`, `onPlayerDeath`, `onPlayerQuit`.
+
 ### Effects the weapon owns
 
 A weapon that has an effect class (`EruptionEffect`, `PetalEffect`, ...) creates it in `createListener`, hands it to
@@ -118,8 +134,3 @@ No Java change is needed: the pack archive picks up everything in that folder.
 - Anything keyed by an *entity* (an arrow, a trident) is tagged with persistent data instead of held in a map, or
   the map entry has a timeout.
 - An item you take from a player is always handed back or dropped, even if the player quits meanwhile.
-
-## What is not automatic yet
-
-- Death messages: `DeathMessages` has a style per built-in weapon. A new weapon falls back to the generic message
-  with its name. Add a style there for a custom one.

@@ -1,5 +1,6 @@
 package net.rose.customPlugin.listener.trident;
 
+import net.rose.customPlugin.api.PrimedAbility;
 import net.rose.customPlugin.api.WeaponContext;
 import net.rose.customPlugin.api.AbilityListener;
 import net.kyori.adventure.bossbar.BossBar;
@@ -18,20 +19,15 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
-import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 public final class TempestTridentListener extends AbilityListener<TempestTrident> {
 
     private static final long THROW_COOLDOWN_MS = 30_000;
-    private static final String THROW_ID = "tempest_throw";
-    private static final String LABEL = "Tempest";
     /** A trident that never reports a hit (void, despawn, unloaded chunk) is forgotten after this long. */
     private static final long EMPOWERED_TIMEOUT_MS = 5 * 60_000L;
 
@@ -40,23 +36,20 @@ public final class TempestTridentListener extends AbilityListener<TempestTrident
 
     private final TempestSpinEffect spin;
 
-    private final Set<UUID> armed = new HashSet<>();
+    private final PrimedAbility throwing;
     /** Tridents in flight that carry the ability: trident entity id -> who threw it. */
     private final Map<UUID, Empowered> empowered = new HashMap<>();
 
     public TempestTridentListener(WeaponContext context, TempestTrident trident, TempestSpinEffect spin) {
         super(context, trident);
         this.spin = spin;
+        this.throwing = primedAbility("tempest_throw", "Tempest", BossBar.Color.BLUE, THROW_COOLDOWN_MS);
     }
 
     /** Offhand key (F) while holding the Tempest Trident primes the next throw. The swap itself is always cancelled. */
     @Override
     protected void onOffhand(Player player, boolean sneaking) {
-        if (cooldowns.isOnCooldown(player, THROW_ID)) return; // boss bar already shows the time left
-        if (!armed.add(player.getUniqueId())) return;
-
-        cooldowns.prime(player, THROW_ID, LABEL, BossBar.Color.BLUE);
-        player.playSound(player.getLocation(), Sound.ITEM_TRIDENT_THUNDER, 0.6f, 1.6f);
+        if (throwing.prime(player)) player.playSound(player.getLocation(), Sound.ITEM_TRIDENT_THUNDER, 0.6f, 1.6f);
     }
 
     /** The next Tempest Trident the player throws after priming carries the ability. */
@@ -65,10 +58,8 @@ public final class TempestTridentListener extends AbilityListener<TempestTrident
         if (!(event.getEntity() instanceof Trident thrown)) return;
         if (!(thrown.getShooter() instanceof Player player)) return;
         if (!weapon.isWeapon(thrown.getItemStack())) return;
-        if (!armed.remove(player.getUniqueId())) return;
+        if (!throwing.spend(player)) return;
 
-        cooldowns.unprime(player, THROW_ID);
-        cooldowns.start(player, THROW_ID, LABEL, BossBar.Color.BLUE, THROW_COOLDOWN_MS);
         long now = System.currentTimeMillis();
         empowered.values().removeIf(entry -> now - entry.at() > EMPOWERED_TIMEOUT_MS);
         empowered.put(thrown.getUniqueId(), new Empowered(player.getUniqueId(), now));
@@ -106,22 +97,4 @@ public final class TempestTridentListener extends AbilityListener<TempestTrident
         });
     }
 
-    /** Dropping the weapon cancels a primed ability, so its boss bar doesn't stay behind. */
-    @EventHandler(ignoreCancelled = true)
-    public void onDrop(PlayerDropItemEvent event) {
-        if (!weapon.isWeapon(event.getItemDrop().getItemStack())) return;
-        Player player = event.getPlayer();
-        if (armed.remove(player.getUniqueId())) cooldowns.unprime(player, THROW_ID);
-    }
-
-    @Override
-    protected void onPlayerDeath(Player player) {
-        armed.remove(player.getUniqueId());
-        cooldowns.unprime(player, THROW_ID);
-    }
-
-    @Override
-    protected void onPlayerQuit(Player player) {
-        armed.remove(player.getUniqueId());
-    }
 }

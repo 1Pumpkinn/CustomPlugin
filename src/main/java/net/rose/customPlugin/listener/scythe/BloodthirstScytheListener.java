@@ -24,7 +24,6 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
-import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 
 import java.util.HashMap;
@@ -168,11 +167,10 @@ public final class BloodthirstScytheListener extends AbilityListener<Bloodthirst
 
     // ------------------------------------------------------------------ Lifecycle
 
-    @EventHandler(ignoreCancelled = true)
-    public void onDrop(PlayerDropItemEvent event) {
-        if (!weapon.isWeapon(event.getItemDrop().getItemStack())) return;
-        stored.remove(event.getPlayer().getUniqueId());
-        hideBar(event.getPlayer());
+    @Override
+    protected void onWeaponDropped(Player player) {
+        stored.remove(player.getUniqueId());
+        hideBar(player);
     }
 
     @Override

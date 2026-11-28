@@ -37,6 +37,14 @@ public final class Hat extends CustomWeapon {
     }
 
     @Override
+    public List<String> deathMessages() {
+        return List.of(
+                "<victim> was shredded by <killer>'s <weapon>",
+                "<killer> sliced <victim> up with a spinning <weapon>",
+                "<victim> lost a fight with <killer>'s <weapon>");
+    }
+
+    @Override
     public Listener createListener(WeaponContext context) {
         this.effects = new HatEffects(plugin, this, context.deaths());
         this.listener = new HatListener(context, this, effects);

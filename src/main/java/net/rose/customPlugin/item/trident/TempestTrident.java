@@ -32,6 +32,14 @@ public final class TempestTrident extends CustomWeapon {
     }
 
     @Override
+    public List<String> deathMessages() {
+        return List.of(
+                "<victim> was torn apart by <killer>'s <weapon>",
+                "<killer> trapped <victim> in a tempest with the <weapon>",
+                "<victim> was swept away by <killer>'s storm");
+    }
+
+    @Override
     public Listener createListener(WeaponContext context) {
         this.spin = new TempestSpinEffect(plugin, context.deaths());
         return new TempestTridentListener(context, this, spin);

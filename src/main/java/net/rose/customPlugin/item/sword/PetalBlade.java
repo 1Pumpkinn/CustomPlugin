@@ -32,6 +32,14 @@ public final class PetalBlade extends CustomWeapon {
     }
 
     @Override
+    public List<String> deathMessages() {
+        return List.of(
+                "<victim> was cut down by <killer>'s <weapon>",
+                "<killer> sent <victim> off in a flurry of petals",
+                "<victim> wilted to <killer>'s <weapon>");
+    }
+
+    @Override
     public Listener createListener(WeaponContext context) {
         this.petals = new PetalEffect(plugin, context.deaths());
         return new PetalBladeListener(context, this, petals);

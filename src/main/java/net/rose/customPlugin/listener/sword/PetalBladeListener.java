@@ -1,5 +1,6 @@
 package net.rose.customPlugin.listener.sword;
 
+import net.rose.customPlugin.api.RightClick;
 import net.rose.customPlugin.api.WeaponContext;
 import net.rose.customPlugin.api.AbilityListener;
 import net.kyori.adventure.bossbar.BossBar;
@@ -9,11 +10,8 @@ import net.rose.customPlugin.effect.PetalEffect;
 import net.rose.customPlugin.item.sword.PetalBlade;
 import org.bukkit.GameMode;
 import org.bukkit.entity.Player;
-import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
-import org.bukkit.event.block.Action;
-import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 
@@ -39,23 +37,14 @@ public final class PetalBladeListener extends AbilityListener<PetalBlade> implem
     // What matters is whether another plugin denied using the item.
     @EventHandler(priority = EventPriority.HIGH)
     public void onInteract(PlayerInteractEvent event) {
-        Action action = event.getAction();
-        if (action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) return;
-        if (event.useItemInHand() == Event.Result.DENY) return;
-        if (event.getHand() != EquipmentSlot.HAND) return;
+        if (!RightClick.isUse(event) || event.getHand() != EquipmentSlot.HAND) return;
         if (!weapon.isWeapon(event.getItem())) return;
 
         Player player = event.getPlayer();
         if (player.getGameMode() == GameMode.SPECTATOR) return;
         if (!petals.isActive(player)) return;
 
-        // Chests, doors, buttons... still work like normal, unless the player is sneaking.
-        if (action == Action.RIGHT_CLICK_BLOCK
-                && !player.isSneaking()
-                && event.getClickedBlock() != null
-                && event.getClickedBlock().getType().isInteractable()) {
-            return;
-        }
+        if (RightClick.yieldsToBlock(event)) return; // chests, doors, buttons... still work like normal
         event.setCancelled(true);
         petals.throwPetal(player);
     }
@@ -67,10 +56,8 @@ public final class PetalBladeListener extends AbilityListener<PetalBlade> implem
     }
 
     /** Dropping the blade ends the petals and takes the boss bar with it (the cooldown still counts). */
-    @EventHandler(ignoreCancelled = true)
-    public void onDrop(PlayerDropItemEvent event) {
-        if (!weapon.isWeapon(event.getItemDrop().getItemStack())) return;
-        Player player = event.getPlayer();
+    @Override
+    protected void onWeaponDropped(Player player) {
         if (!petals.isActive(player)) return;
 
         petals.cancel(player);

@@ -1,5 +1,6 @@
 package net.rose.customPlugin.listener.axe;
 
+import net.rose.customPlugin.util.Aim;
 import net.rose.customPlugin.api.WeaponContext;
 import net.rose.customPlugin.api.AbilityListener;
 import net.kyori.adventure.bossbar.BossBar;
@@ -8,14 +9,8 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.rose.customPlugin.effect.AxeSpinEffect;
 import net.rose.customPlugin.effect.EruptionEffect;
 import net.rose.customPlugin.item.axe.VolcanicAxe;
-import net.rose.customPlugin.util.Targets;
-import org.bukkit.FluidCollisionMode;
-import org.bukkit.Location;
-import org.bukkit.World;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
-import org.bukkit.util.RayTraceResult;
-import org.bukkit.util.Vector;
 
 public final class VolcanicAxeListener extends AbilityListener<VolcanicAxe> {
 
@@ -64,7 +59,7 @@ public final class VolcanicAxeListener extends AbilityListener<VolcanicAxe> {
     private void useEruption(Player player) {
         if (cooldowns.isOnCooldown(player, ERUPTION_ID)) return; // boss bar already shows the time left
 
-        LivingEntity target = findTarget(player);
+        LivingEntity target = Aim.lookedAt(player, ERUPTION_RANGE, RAY_SIZE);
         if (target == null) {
             player.sendActionBar(Component.text("Look at a target to use Eruption", NamedTextColor.RED));
             return; // failed cast stays free (no cooldown)
@@ -79,19 +74,5 @@ public final class VolcanicAxeListener extends AbilityListener<VolcanicAxe> {
 
         cooldowns.start(player, SPIN_ID, "Spinning Axe", BossBar.Color.YELLOW, SPIN_COOLDOWN_MS);
         spin.start(player);
-    }
-
-    /** First valid target (player or mob) in the line of sight, stopped by walls. */
-    private LivingEntity findTarget(Player player) {
-        World world = player.getWorld();
-        Location eye = player.getEyeLocation();
-        Vector dir = eye.getDirection();
-
-        RayTraceResult blocks = world.rayTraceBlocks(eye, dir, ERUPTION_RANGE, FluidCollisionMode.NEVER, true);
-        double maxDistance = blocks == null ? ERUPTION_RANGE : blocks.getHitPosition().distance(eye.toVector());
-
-        RayTraceResult hit = world.rayTraceEntities(eye, dir, maxDistance, RAY_SIZE,
-                e -> Targets.isValidTarget(player, e));
-        return hit != null && hit.getHitEntity() instanceof LivingEntity target ? target : null;
     }
 }
