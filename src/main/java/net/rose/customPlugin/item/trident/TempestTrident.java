@@ -1,53 +1,54 @@
 package net.rose.customPlugin.item.trident;
 
-import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextColor;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
-import net.rose.customPlugin.util.MaxEnchants;
+import net.rose.customPlugin.api.Ability;
+import net.rose.customPlugin.api.CustomWeapon;
+import net.rose.customPlugin.api.WeaponContext;
+import net.rose.customPlugin.effect.TempestSpinEffect;
+import net.rose.customPlugin.listener.trident.TempestTridentListener;
 import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
 
-public final class TempestTrident {
+public final class TempestTrident extends CustomWeapon {
 
     public static final TextColor COLOR = TextColor.color(0x3FC8E0);
 
-    private final NamespacedKey key;
+    private final JavaPlugin plugin;
+    private TempestSpinEffect spin;
 
     public TempestTrident(JavaPlugin plugin) {
-        this.key = new NamespacedKey(plugin, "tempest_trident");
+        super(plugin, "tempesttrident", "tempest_trident", "Tempest Trident", COLOR, Material.TRIDENT);
+        this.plugin = plugin;
     }
 
-    public ItemStack create() {
-        ItemStack item = new ItemStack(Material.TRIDENT);
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(Component.text("Tempest Trident", COLOR)
-                .decoration(TextDecoration.ITALIC, false));
-        meta.lore(List.of(
-                ability("Offhand", "Prime your next throw"),
-                ability("Throw", "The trident spins around the player it hits for 3s, dealing 4 hearts of true damage")
-        ));
-        meta.setItemModel(key); // texture pack model: customplugin:<name>
-        meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
-        item.setItemMeta(meta);
-        MaxEnchants.apply(item); // weapons always come fully enchanted
-        return item;
+    @Override
+    public List<Ability> abilities() {
+        return List.of(
+                Ability.offhand("Prime your next throw"),
+                Ability.of("Throw", "The trident spins around the player it hits for 3s, dealing 4 hearts of true damage"));
     }
 
-    public boolean isTempestTrident(ItemStack item) {
-        if (item == null || !item.hasItemMeta()) return false;
-        return item.getItemMeta().getPersistentDataContainer().has(key, PersistentDataType.BYTE);
+    @Override
+    public Listener createListener(WeaponContext context) {
+        this.spin = new TempestSpinEffect(plugin, context.deaths());
+        return new TempestTridentListener(context, this, spin);
     }
 
-    private static Component ability(String trigger, String description) {
-        return Component.text(trigger, COLOR)
-                .append(Component.text(" - " + description, NamedTextColor.GRAY))
-                .decoration(TextDecoration.ITALIC, false);
+    @Override
+    public void onDisable() {
+        if (spin != null) spin.removeAll();
+    }
+
+    @Override
+    public int defaultTier() {
+        return 2;
+    }
+
+    @Override
+    public int defaultPrice() {
+        return 24;
     }
 }

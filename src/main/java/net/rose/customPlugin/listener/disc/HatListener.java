@@ -1,29 +1,24 @@
 package net.rose.customPlugin.listener.disc;
 
+import net.rose.customPlugin.api.WeaponContext;
+import net.rose.customPlugin.api.AbilityListener;
 import net.kyori.adventure.bossbar.BossBar;
 import net.rose.customPlugin.effect.HatEffects;
 import net.rose.customPlugin.effect.ZeusDiscFlight;
 import net.rose.customPlugin.item.misc.Hat;
-import net.rose.customPlugin.util.CooldownBars;
 import net.rose.customPlugin.util.DeathMessages;
 import org.bukkit.GameMode;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.entity.EntityDamageEvent;
-import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
-import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -31,7 +26,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Level;
 
-public final class HatListener implements Listener {
+public final class HatListener extends AbilityListener<Hat> {
 
     private static final int OFFHAND_SLOT = 40;
     /** How fast the thrown hat flies compared to the Zeus Disc (1.0). Lower is slower. */
@@ -44,28 +39,19 @@ public final class HatListener implements Listener {
     private static final String PAD_ID = "hat_bounce";
     private static final String RAZOR_ID = "hat_razor";
 
-    private final JavaPlugin plugin;
-    private final Hat hat;
-    private final CooldownBars cooldowns;
     private final HatEffects effects;
     private final DeathMessages deaths;
     private final Map<UUID, ZeusDiscFlight> flights = new HashMap<>();
 
-    public HatListener(JavaPlugin plugin, Hat hat, CooldownBars cooldowns, HatEffects effects, DeathMessages deaths) {
-        this.plugin = plugin;
-        this.hat = hat;
-        this.cooldowns = cooldowns;
+    public HatListener(WeaponContext context, Hat hat, HatEffects effects) {
+        super(context, hat);
         this.effects = effects;
-        this.deaths = deaths;
+        this.deaths = context.deaths();
     }
 
     /** Offhand key (F) while holding the Hat: throw the bounce hat, or the razor hat when crouching. The swap is always cancelled. */
-    @EventHandler(ignoreCancelled = true)
-    public void onSwapHand(PlayerSwapHandItemsEvent event) {
-        Player player = event.getPlayer();
-        if (!hat.isHat(player.getInventory().getItemInMainHand())) return;
-
-        event.setCancelled(true);
+    @Override
+    protected void onOffhand(Player player, boolean sneaking) {
         throwHat(player);
     }
 
@@ -80,7 +66,7 @@ public final class HatListener implements Listener {
 
         EquipmentSlot hand = event.getHand();
         if (hand != EquipmentSlot.HAND && hand != EquipmentSlot.OFF_HAND) return;
-        if (!hat.isHat(event.getItem())) return;
+        if (!weapon.isWeapon(event.getItem())) return;
 
         Player player = event.getPlayer();
         // Chests, doors, buttons... still work like normal, unless the player is sneaking.
@@ -112,7 +98,7 @@ public final class HatListener implements Listener {
         PlayerInventory inventory = player.getInventory();
         int slot = hand == EquipmentSlot.OFF_HAND ? OFFHAND_SLOT : inventory.getHeldItemSlot();
         ItemStack held = inventory.getItem(slot);
-        if (!hat.isHat(held)) return;
+        if (!weapon.isWeapon(held)) return;
 
         ItemStack thrown = held.clone();
         thrown.setAmount(1);
@@ -170,7 +156,7 @@ public final class HatListener implements Listener {
         PlayerInventory inventory = player.getInventory();
         int slot = inventory.getHeldItemSlot();
         ItemStack held = inventory.getItem(slot);
-        if (!hat.isHat(held)) return null;
+        if (!weapon.isWeapon(held)) return null;
 
         ItemStack thrown = held.clone();
         thrown.setAmount(1);
@@ -193,21 +179,15 @@ public final class HatListener implements Listener {
         }
     }
 
-    @EventHandler
-    public void onDeath(PlayerDeathEvent event) {
-        effects.cancelAndDrop(event.getEntity()); // the hat is not in the inventory, so it drops where it is
+    @Override
+    protected void onPlayerDeath(Player player) {
+        effects.cancelAndDrop(player); // the hat is not in the inventory, so it drops where it is
     }
 
-    @EventHandler
-    public void onJoin(PlayerJoinEvent event) {
-        cooldowns.resume(event.getPlayer());
-    }
-
-    @EventHandler(priority = EventPriority.LOWEST)
-    public void onQuit(PlayerQuitEvent event) {
-        ZeusDiscFlight flight = flights.get(event.getPlayer().getUniqueId());
+    @Override
+    protected void onPlayerQuit(Player player) {
+        ZeusDiscFlight flight = flights.get(player.getUniqueId());
         if (flight != null) flight.end(); // a hat in the air would be lost if the player left
-        effects.cancel(event.getPlayer());
-        cooldowns.hideAll(event.getPlayer());
+        effects.cancel(player);
     }
 }

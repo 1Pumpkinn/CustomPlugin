@@ -1,9 +1,10 @@
 package net.rose.customPlugin.listener.spear;
 
+import net.rose.customPlugin.api.WeaponContext;
+import net.rose.customPlugin.api.AbilityListener;
 import net.kyori.adventure.bossbar.BossBar;
 import net.rose.customPlugin.effect.FrostEffects;
 import net.rose.customPlugin.item.spear.FrostSpear;
-import net.rose.customPlugin.util.CooldownBars;
 import net.rose.customPlugin.util.Targets;
 import org.bukkit.Location;
 import org.bukkit.Particle;
@@ -14,13 +15,8 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.player.PlayerSwapHandItemsEvent;
-import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
@@ -31,7 +27,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-public final class FrostSpearListener implements Listener {
+public final class FrostSpearListener extends AbilityListener<FrostSpear> {
 
     // --- Dash ---
     private static final long DASH_COOLDOWN_MS = 25_000;
@@ -49,25 +45,16 @@ public final class FrostSpearListener implements Listener {
 
     private static final String DASH_ID = "frost_dash";
 
-    private final JavaPlugin plugin;
-    private final FrostSpear spear;
-    private final CooldownBars cooldowns;
     private final FrostEffects frost;
 
-    public FrostSpearListener(JavaPlugin plugin, FrostSpear spear, CooldownBars cooldowns, FrostEffects frost) {
-        this.plugin = plugin;
-        this.spear = spear;
-        this.cooldowns = cooldowns;
+    public FrostSpearListener(WeaponContext context, FrostSpear spear, FrostEffects frost) {
+        super(context, spear);
         this.frost = frost;
     }
 
     /** Offhand key (F) while holding the Frost Spear dashes forward. The swap itself is always cancelled. */
-    @EventHandler(ignoreCancelled = true)
-    public void onSwapHand(PlayerSwapHandItemsEvent event) {
-        Player player = event.getPlayer();
-        if (!spear.isFrostSpear(player.getInventory().getItemInMainHand())) return;
-
-        event.setCancelled(true);
+    @Override
+    protected void onOffhand(Player player, boolean sneaking) {
         dash(player);
     }
 
@@ -78,7 +65,7 @@ public final class FrostSpearListener implements Listener {
         if (event.getCause() != EntityDamageEvent.DamageCause.ENTITY_ATTACK) return;
         if (!(event.getDamager() instanceof Player attacker)) return;
         if (!Targets.isValidTarget(attacker, event.getEntity())) return;
-        if (!spear.isFrostSpear(attacker.getInventory().getItemInMainHand())) return;
+        if (!weapon.isWeapon(attacker.getInventory().getItemInMainHand())) return;
 
         frost.chill((LivingEntity) event.getEntity(), PASSIVE_FREEZE_TICKS);
     }
@@ -90,16 +77,6 @@ public final class FrostSpearListener implements Listener {
         if (!(event.getEntity() instanceof LivingEntity living)) return;
         if (frost.isApplyingDamage()) return;
         if (frost.isHarmlessFreeze(living)) event.setCancelled(true);
-    }
-
-    @EventHandler
-    public void onJoin(PlayerJoinEvent event) {
-        cooldowns.resume(event.getPlayer());
-    }
-
-    @EventHandler
-    public void onQuit(PlayerQuitEvent event) {
-        cooldowns.hideAll(event.getPlayer());
     }
 
     // ------------------------------------------------------------------ Dash

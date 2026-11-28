@@ -1,57 +1,58 @@
 package net.rose.customPlugin.item.spear;
 
-import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
-import net.rose.customPlugin.util.MaxEnchants;
+import net.rose.customPlugin.api.Ability;
+import net.rose.customPlugin.api.CustomWeapon;
+import net.rose.customPlugin.api.WeaponContext;
+import net.rose.customPlugin.effect.FrostEffects;
+import net.rose.customPlugin.listener.spear.FrostSpearListener;
 import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
 import java.util.Set;
 
-public final class FrostSpear {
+public final class FrostSpear extends CustomWeapon {
 
-    private final NamespacedKey key;
+    private final FrostEffects frost;
 
-    public FrostSpear(JavaPlugin plugin) {
-        this.key = new NamespacedKey(plugin, "frost_spear");
+    /** @param frost shared with the stun listener, which is why the plugin creates it and shuts it down */
+    public FrostSpear(JavaPlugin plugin, FrostEffects frost) {
+        super(plugin, "frostspear", "frost_spear", "Frost Spear", NamedTextColor.AQUA, spearMaterial());
+        this.frost = frost;
     }
 
-    public ItemStack create() {
-        ItemStack item = new ItemStack(spearMaterial());
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(Component.text("Frost Spear", NamedTextColor.AQUA)
-                .decoration(TextDecoration.ITALIC, false));
-        meta.lore(List.of(
-                ability("Offhand", "Dash forward, freezing and stunning every player and mob you dash into"),
-                ability("Passive", "Stabbing a player or mob frosts and slows them")
-        ));
-        meta.setItemModel(key); // texture pack model: customplugin:<name>
-        meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
-        item.setItemMeta(meta);
-        MaxEnchants.apply(item, Set.of("fire_aspect")); // fully enchanted, but a frost spear never burns
-        return item;
+    @Override
+    public List<Ability> abilities() {
+        return List.of(
+                Ability.offhand("Dash forward, freezing and stunning every player and mob you dash into"),
+                Ability.passive("Stabbing a player or mob frosts and slows them"));
     }
 
-    public boolean isFrostSpear(ItemStack item) {
-        if (item == null || !item.hasItemMeta()) return false;
-        return item.getItemMeta().getPersistentDataContainer().has(key, PersistentDataType.BYTE);
+    @Override
+    public Listener createListener(WeaponContext context) {
+        return new FrostSpearListener(context, this, frost);
+    }
+
+    @Override
+    protected Set<String> skippedEnchants() {
+        return Set.of("fire_aspect"); // fully enchanted, but a frost spear never burns
+    }
+
+    @Override
+    public int defaultTier() {
+        return 1;
+    }
+
+    @Override
+    public int defaultPrice() {
+        return 48;
     }
 
     /** Netherite spear (1.21.11+), falling back to a trident on versions without spears. */
     private static Material spearMaterial() {
         Material spear = Material.matchMaterial("NETHERITE_SPEAR");
         return spear != null ? spear : Material.TRIDENT;
-    }
-
-    private static Component ability(String trigger, String description) {
-        return Component.text(trigger, NamedTextColor.AQUA)
-                .append(Component.text(" - " + description, NamedTextColor.GRAY))
-                .decoration(TextDecoration.ITALIC, false);
     }
 }

@@ -1,11 +1,12 @@
 package net.rose.customPlugin.listener.scythe;
 
+import net.rose.customPlugin.api.WeaponContext;
+import net.rose.customPlugin.api.AbilityListener;
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.rose.customPlugin.effect.VampireSweepEffect;
 import net.rose.customPlugin.item.scythe.BloodthirstScythe;
-import net.rose.customPlugin.util.CooldownBars;
 import net.rose.customPlugin.util.Targets;
 import net.rose.customPlugin.util.TrueDamage;
 import org.bukkit.Color;
@@ -20,16 +21,11 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
-import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -41,7 +37,7 @@ import java.util.UUID;
  * Bloodthirst Scythe: every melee hit stores a little health, offhand is a vampire sweep that steals health, and
  * crouch + offhand spends everything stored to heal the wielder. Stored health is kept in HP (2 HP = 1 heart).
  */
-public final class BloodthirstScytheListener implements Listener {
+public final class BloodthirstScytheListener extends AbilityListener<BloodthirstScythe> {
 
     // --- Passive: stored hearts ---
     private static final double HP_PER_HIT = 0.6;           // 0.3 hearts
@@ -60,16 +56,13 @@ public final class BloodthirstScytheListener implements Listener {
     private static final BlockData BLOOD_BLOCK = Material.REDSTONE_BLOCK.createBlockData();
     private static final Particle.DustOptions BLOOD_DUST = new Particle.DustOptions(Color.fromRGB(0xC4, 0x12, 0x1F), 1.2f);
 
-    private final BloodthirstScythe scythe;
-    private final CooldownBars cooldowns;
     private final VampireSweepEffect sweep;
 
     private final Map<UUID, Double> stored = new HashMap<>();
     private final Set<UUID> barShown = new HashSet<>();
 
-    public BloodthirstScytheListener(BloodthirstScythe scythe, CooldownBars cooldowns, VampireSweepEffect sweep) {
-        this.scythe = scythe;
-        this.cooldowns = cooldowns;
+    public BloodthirstScytheListener(WeaponContext context, BloodthirstScythe scythe, VampireSweepEffect sweep) {
+        super(context, scythe);
         this.sweep = sweep;
     }
 
@@ -82,7 +75,7 @@ public final class BloodthirstScytheListener implements Listener {
         if (!(event.getDamager() instanceof Player attacker)) return;
         if (TrueDamage.isTrueDamage(event.getEntity())) return; // ability damage is not a melee hit
         if (!Targets.isValidTarget(attacker, event.getEntity())) return;
-        if (!scythe.isBloodthirstScythe(attacker.getInventory().getItemInMainHand())) return;
+        if (!weapon.isWeapon(attacker.getInventory().getItemInMainHand())) return;
         if (cooldowns.isOnCooldown(attacker, HEAL_ID)) return; // no new blood while the heal is on cooldown
 
         LivingEntity victim = (LivingEntity) event.getEntity();
@@ -99,13 +92,9 @@ public final class BloodthirstScytheListener implements Listener {
     // ------------------------------------------------------------------ Offhand
 
     /** Offhand key (F) while holding the scythe: vampire sweep, or heal when crouching. The swap itself is always cancelled. */
-    @EventHandler(ignoreCancelled = true)
-    public void onSwapHand(PlayerSwapHandItemsEvent event) {
-        Player player = event.getPlayer();
-        if (!scythe.isBloodthirstScythe(player.getInventory().getItemInMainHand())) return;
-
-        event.setCancelled(true);
-        if (player.isSneaking()) {
+    @Override
+    protected void onOffhand(Player player, boolean sneaking) {
+        if (sneaking) {
             consumeHearts(player);
         } else {
             vampireSweep(player);
@@ -170,7 +159,7 @@ public final class BloodthirstScytheListener implements Listener {
     @EventHandler
     public void onHeld(PlayerItemHeldEvent event) {
         Player player = event.getPlayer();
-        if (scythe.isBloodthirstScythe(player.getInventory().getItem(event.getNewSlot()))) {
+        if (weapon.isWeapon(player.getInventory().getItem(event.getNewSlot()))) {
             refreshBar(player);
         } else {
             hideBar(player);
@@ -181,31 +170,26 @@ public final class BloodthirstScytheListener implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onDrop(PlayerDropItemEvent event) {
-        if (!scythe.isBloodthirstScythe(event.getItemDrop().getItemStack())) return;
+        if (!weapon.isWeapon(event.getItemDrop().getItemStack())) return;
         stored.remove(event.getPlayer().getUniqueId());
         hideBar(event.getPlayer());
     }
 
-    @EventHandler
-    public void onDeath(PlayerDeathEvent event) {
-        Player player = event.getEntity();
+    @Override
+    protected void onPlayerDeath(Player player) {
         stored.remove(player.getUniqueId());
         hideBar(player);
     }
 
-    @EventHandler
-    public void onJoin(PlayerJoinEvent event) {
-        Player player = event.getPlayer();
-        cooldowns.resume(player);
-        if (scythe.isBloodthirstScythe(player.getInventory().getItemInMainHand())) {
+    @Override
+    protected void onPlayerJoin(Player player) {
+        if (weapon.isWeapon(player.getInventory().getItemInMainHand())) {
             refreshBar(player);
         }
     }
 
-    @EventHandler(priority = EventPriority.LOWEST)
-    public void onQuit(PlayerQuitEvent event) {
-        Player player = event.getPlayer();
+    @Override
+    protected void onPlayerQuit(Player player) {
         barShown.remove(player.getUniqueId()); // hideAll drops primed bars; stored hearts are kept
-        cooldowns.hideAll(player);
     }
 }

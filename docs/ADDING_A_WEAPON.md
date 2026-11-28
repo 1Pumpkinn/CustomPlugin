@@ -4,8 +4,9 @@ A weapon is two small classes plus its resource pack files. Everything else (the
 the weapon limit, the dropped-item beacon, lore refreshing, the `weapons.<id>` entry in `config.yml`) is wired up
 for you by `WeaponManager.register`.
 
-The Hunter's Bow (`item/bow/HuntersBow.java` + `listener/bow/HuntersBowListener.java`) is the reference
-implementation. Copy it.
+Every weapon in the plugin is built this way. The Hunter's Bow (`item/bow/HuntersBow.java` +
+`listener/bow/HuntersBowListener.java`) is the smallest example; the Volcanic Axe (attributes, two effects owned by
+the weapon) and the Zeus Disc (data components, a listener that needs shutting down) show the hooks below.
 
 ## 1. The item: extend `CustomWeapon`
 
@@ -37,8 +38,10 @@ public final class MyBow extends CustomWeapon {
 | `createListener(ctx)`          | Your abilities. Return `null` if the weapon has none.                         |
 | `defaultTier()` / `defaultPrice()` | Written to `config.yml` the first time (defaults: tier 2, price 32). The server owner edits them there afterwards. |
 | `customize(ItemMeta)`          | Attributes, flags, unbreakable, etc.                                          |
+| `finish(ItemStack)`            | Runs on the finished item, for what the meta can't reach (data components such as `JUKEBOX_PLAYABLE`). |
 | `maxEnchanted()`               | `false` to skip the automatic max enchants.                                   |
-| `onDisable()`                  | End anything the weapon keeps running (displays, tasks).                      |
+| `skippedEnchants()`            | Enchantment keys the automatic max enchants leave off (e.g. `Set.of("fire_aspect")`). |
+| `onDisable()`                  | End anything the weapon keeps running (displays, tasks, effects).             |
 | `isWeapon(ItemStack)`          | Is this stack your weapon? Null-safe.                                         |
 
 The `id` is lower case with no spaces. It is the `/weapon` name and the key under `weapons:` in `config.yml`.
@@ -72,10 +75,18 @@ public final class MyBowListener extends AbilityListener<MyBow> {
 ```
 
 The base class already handles: the offhand key, restoring cooldown boss bars on join, hiding them on quit.
+`onPlayerJoin(player)` runs right after the bars are restored, for anything else a weapon shows on join.
 `usesOffhand()` returns `false` if the weapon does not use F (so F is left alone).
 
 Helpers: `key(name)` (a namespaced key for tagging arrows or entities), `ready(player, id)`,
 `startCooldown(...)`. `cooldowns` (primed bars: `prime / updatePrimed / unprime`), `plugin` and `weapon` are fields.
+
+### Effects the weapon owns
+
+A weapon that has an effect class (`EruptionEffect`, `PetalEffect`, ...) creates it in `createListener`, hands it to
+its listener, and ends it in `onDisable()` (see `VolcanicAxe`, `PetalBlade`, `Hat`). The plugin then has nothing
+weapon-specific to start or stop. An effect that something other than the weapon also uses (the Frost Spear's
+`FrostEffects` is shared with the stun listener) is created by the plugin and passed to the weapon's constructor.
 
 ## 3. Register it
 
@@ -112,5 +123,3 @@ No Java change is needed: the pack archive picks up everything in that folder.
 
 - Death messages: `DeathMessages` has a style per built-in weapon. A new weapon falls back to the generic message
   with its name. Add a style there for a custom one.
-- Weapons that are not on the API (Tide Blade, Volcanic Axe, ...) are still wired by hand in `CustomPlugin`. They
-  work exactly as before and can be moved over one at a time.

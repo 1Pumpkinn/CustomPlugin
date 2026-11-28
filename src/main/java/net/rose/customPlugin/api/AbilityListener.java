@@ -17,7 +17,7 @@ import org.bukkit.plugin.java.JavaPlugin;
  * Base class for a weapon's listener. It already does what every weapon listener needs:
  * <ul>
  *   <li>the offhand key (F) with the weapon in the main hand calls {@link #onOffhand} and cancels the swap;</li>
- *   <li>cooldown boss bars are hidden on quit and restored on join;</li>
+ *   <li>cooldown boss bars are hidden on quit and restored on join ({@link #onPlayerJoin} runs after that);</li>
  *   <li>{@link #onPlayerDeath} and {@link #onPlayerQuit} let a weapon clear its own per-player state.</li>
  * </ul>
  * Add your own {@code @EventHandler} methods for anything else (hits, shots, right-clicks).
@@ -44,6 +44,10 @@ public abstract class AbilityListener<W extends CustomWeapon> implements Listene
     /** Whether F with the weapon in hand is used by this weapon (and so cancelled). Default true. */
     protected boolean usesOffhand() {
         return true;
+    }
+
+    /** The player joined. Cooldown boss bars are already restored; use this to show anything else the weapon needs. */
+    protected void onPlayerJoin(Player player) {
     }
 
     /** The player died: clear anything that should not survive death (primed state, stored charge). */
@@ -85,7 +89,9 @@ public abstract class AbilityListener<W extends CustomWeapon> implements Listene
 
     @EventHandler
     public final void onJoin(PlayerJoinEvent event) {
-        cooldowns.resume(event.getPlayer());
+        Player player = event.getPlayer();
+        cooldowns.resume(player);
+        onPlayerJoin(player);
     }
 
     @EventHandler

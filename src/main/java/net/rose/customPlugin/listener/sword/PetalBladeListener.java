@@ -1,51 +1,37 @@
 package net.rose.customPlugin.listener.sword;
 
+import net.rose.customPlugin.api.WeaponContext;
+import net.rose.customPlugin.api.AbilityListener;
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.rose.customPlugin.effect.PetalEffect;
 import net.rose.customPlugin.item.sword.PetalBlade;
-import net.rose.customPlugin.util.CooldownBars;
 import org.bukkit.GameMode;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
-import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.EquipmentSlot;
-import org.bukkit.plugin.java.JavaPlugin;
 
-public final class PetalBladeListener implements Listener, PetalEffect.Callbacks {
+public final class PetalBladeListener extends AbilityListener<PetalBlade> implements PetalEffect.Callbacks {
 
     private static final String PETALS_ID = "petal_blade";
     private static final long PETALS_COOLDOWN_MS = 30_000;
 
-    private final JavaPlugin plugin;
-    private final PetalBlade blade;
-    private final CooldownBars cooldowns;
     private final PetalEffect petals;
 
-    public PetalBladeListener(JavaPlugin plugin, PetalBlade blade, CooldownBars cooldowns, PetalEffect petals) {
-        this.plugin = plugin;
-        this.blade = blade;
-        this.cooldowns = cooldowns;
+    public PetalBladeListener(WeaponContext context, PetalBlade blade, PetalEffect petals) {
+        super(context, blade);
         this.petals = petals;
     }
 
     /** Offhand key (F) while holding the Petal Blade summons the petals. The swap itself is always cancelled. */
-    @EventHandler(ignoreCancelled = true)
-    public void onSwapHand(PlayerSwapHandItemsEvent event) {
-        Player player = event.getPlayer();
-        if (!blade.isPetalBlade(player.getInventory().getItemInMainHand())) return;
-
-        event.setCancelled(true);
+    @Override
+    protected void onOffhand(Player player, boolean sneaking) {
         summon(player);
     }
 
@@ -57,7 +43,7 @@ public final class PetalBladeListener implements Listener, PetalEffect.Callbacks
         if (action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) return;
         if (event.useItemInHand() == Event.Result.DENY) return;
         if (event.getHand() != EquipmentSlot.HAND) return;
-        if (!blade.isPetalBlade(event.getItem())) return;
+        if (!weapon.isWeapon(event.getItem())) return;
 
         Player player = event.getPlayer();
         if (player.getGameMode() == GameMode.SPECTATOR) return;
@@ -74,9 +60,8 @@ public final class PetalBladeListener implements Listener, PetalEffect.Callbacks
         petals.throwPetal(player);
     }
 
-    @EventHandler
-    public void onDeath(PlayerDeathEvent event) {
-        Player player = event.getEntity();
+    @Override
+    protected void onPlayerDeath(Player player) {
         petals.cancel(player);
         cooldowns.unprime(player, PETALS_ID);
     }
@@ -84,7 +69,7 @@ public final class PetalBladeListener implements Listener, PetalEffect.Callbacks
     /** Dropping the blade ends the petals and takes the boss bar with it (the cooldown still counts). */
     @EventHandler(ignoreCancelled = true)
     public void onDrop(PlayerDropItemEvent event) {
-        if (!blade.isPetalBlade(event.getItemDrop().getItemStack())) return;
+        if (!weapon.isWeapon(event.getItemDrop().getItemStack())) return;
         Player player = event.getPlayer();
         if (!petals.isActive(player)) return;
 
@@ -93,20 +78,13 @@ public final class PetalBladeListener implements Listener, PetalEffect.Callbacks
         cooldowns.start(player, PETALS_ID, "Petal Blade", BossBar.Color.PINK, PETALS_COOLDOWN_MS);
     }
 
-    @EventHandler
-    public void onJoin(PlayerJoinEvent event) {
-        cooldowns.resume(event.getPlayer());
-    }
-
     /** Leaving with petals out still costs the cooldown, so a relog can't be used to skip it. */
-    @EventHandler(priority = EventPriority.LOWEST)
-    public void onQuit(PlayerQuitEvent event) {
-        Player player = event.getPlayer();
+    @Override
+    protected void onPlayerQuit(Player player) {
         if (petals.isActive(player)) {
             petals.cancel(player);
             cooldowns.start(player, PETALS_ID, "Petal Blade", BossBar.Color.PINK, PETALS_COOLDOWN_MS);
         }
-        cooldowns.hideAll(player);
     }
 
     @Override

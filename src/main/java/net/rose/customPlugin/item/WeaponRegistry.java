@@ -1,15 +1,5 @@
 package net.rose.customPlugin.item;
 
-import net.rose.customPlugin.item.axe.VolcanicAxe;
-import net.rose.customPlugin.item.bow.TricksterBow;
-import net.rose.customPlugin.item.disc.ZeusDisc;
-import net.rose.customPlugin.item.mace.MetalicMace;
-import net.rose.customPlugin.item.misc.Hat;
-import net.rose.customPlugin.item.scythe.BloodthirstScythe;
-import net.rose.customPlugin.item.spear.FrostSpear;
-import net.rose.customPlugin.item.sword.PetalBlade;
-import net.rose.customPlugin.item.sword.TideBlade;
-import net.rose.customPlugin.item.trident.TempestTrident;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.Collections;
@@ -19,26 +9,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 
-/** Every giveable weapon by its command name. Used by /weapon and the lore refresher. */
+/** Every giveable weapon by its command name (filled by WeaponManager.register). Used by /weapon, the shop and the lore refresher. */
 public final class WeaponRegistry {
 
     private final Map<String, Supplier<ItemStack>> weapons = new LinkedHashMap<>();
-
-    public WeaponRegistry(TideBlade tideBlade, VolcanicAxe volcanicAxe, FrostSpear frostSpear, MetalicMace metalicMace,
-                          TricksterBow tricksterBow, ZeusDisc zeusDisc, PetalBlade petalBlade,
-                          BloodthirstScythe bloodthirstScythe, TempestTrident tempestTrident, Hat hat) {
-        register("tideblade", tideBlade::create);
-        register("volcanicaxe", volcanicAxe::create);
-        register("frostspear", frostSpear::create);
-        register("metalicmace", metalicMace::create);
-        register("tricksterbow", tricksterBow::create);
-        register("zeusdisc", zeusDisc::create);
-        register("petalblade", petalBlade::create);
-        register("bloodthirstscythe", bloodthirstScythe::create);
-        register("tempesttrident", tempestTrident::create);
-        register("hat", hat::create);
-        // New weapons do not go here: extend CustomWeapon and call WeaponManager.register (see docs/ADDING_A_WEAPON.md).
-    }
 
     public void register(String id, Supplier<ItemStack> supplier) {
         weapons.put(id.toLowerCase(Locale.ROOT), supplier);

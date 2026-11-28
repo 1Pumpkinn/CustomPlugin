@@ -1,10 +1,11 @@
 package net.rose.customPlugin.listener.disc;
 
+import net.rose.customPlugin.api.WeaponContext;
+import net.rose.customPlugin.api.AbilityListener;
 import net.kyori.adventure.bossbar.BossBar;
 import net.rose.customPlugin.effect.ZeusDiscFlight;
 import net.rose.customPlugin.effect.ZeusLightning;
 import net.rose.customPlugin.item.disc.ZeusDisc;
-import net.rose.customPlugin.util.CooldownBars;
 import net.rose.customPlugin.util.DeathMessages;
 import org.bukkit.GameMode;
 import org.bukkit.Sound;
@@ -12,18 +13,12 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
-import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
-import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,37 +28,27 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Level;
 
-public final class ZeusDiscListener implements Listener {
+public final class ZeusDiscListener extends AbilityListener<ZeusDisc> {
 
     private static final long STRIKE_COOLDOWN_MS = 20_000;
     private static final String STRIKE_ID = "zeus_strike";
     private static final int OFFHAND_SLOT = 40;
 
-    private final JavaPlugin plugin;
-    private final ZeusDisc disc;
-    private final CooldownBars cooldowns;
     private final ZeusLightning lightning;
     private final DeathMessages deaths;
 
     private final Set<UUID> armed = new HashSet<>();
     private final Map<UUID, ZeusDiscFlight> flights = new HashMap<>();
 
-    public ZeusDiscListener(JavaPlugin plugin, ZeusDisc disc, CooldownBars cooldowns, ZeusLightning lightning,
-                            DeathMessages deaths) {
-        this.plugin = plugin;
-        this.disc = disc;
-        this.cooldowns = cooldowns;
+    public ZeusDiscListener(WeaponContext context, ZeusDisc disc, ZeusLightning lightning) {
+        super(context, disc);
         this.lightning = lightning;
-        this.deaths = deaths;
+        this.deaths = context.deaths();
     }
 
     /** Offhand key (F) while holding the Zeus Disc primes the next throw. The swap itself is always cancelled. */
-    @EventHandler(ignoreCancelled = true)
-    public void onSwapHand(PlayerSwapHandItemsEvent event) {
-        Player player = event.getPlayer();
-        if (!disc.isZeusDisc(player.getInventory().getItemInMainHand())) return;
-
-        event.setCancelled(true);
+    @Override
+    protected void onOffhand(Player player, boolean sneaking) {
         prime(player);
     }
 
@@ -77,7 +62,7 @@ public final class ZeusDiscListener implements Listener {
 
         EquipmentSlot hand = event.getHand();
         if (hand != EquipmentSlot.HAND && hand != EquipmentSlot.OFF_HAND) return;
-        if (!disc.isZeusDisc(event.getItem())) return;
+        if (!weapon.isWeapon(event.getItem())) return;
 
         Player player = event.getPlayer();
         // Chests, doors, buttons... still work like normal, unless the player is sneaking.
@@ -95,30 +80,23 @@ public final class ZeusDiscListener implements Listener {
     /** Dropping the weapon cancels a primed ability, so its boss bar doesn't stay behind. */
     @EventHandler(ignoreCancelled = true)
     public void onDrop(PlayerDropItemEvent event) {
-        if (!disc.isZeusDisc(event.getItemDrop().getItemStack())) return;
+        if (!weapon.isWeapon(event.getItemDrop().getItemStack())) return;
         Player player = event.getPlayer();
         if (armed.remove(player.getUniqueId())) cooldowns.unprime(player, STRIKE_ID);
     }
 
-    @EventHandler
-    public void onDeath(PlayerDeathEvent event) {
-        armed.remove(event.getEntity().getUniqueId());
-        cooldowns.unprime(event.getEntity(), STRIKE_ID);
-    }
-
-    @EventHandler
-    public void onJoin(PlayerJoinEvent event) {
-        cooldowns.resume(event.getPlayer());
+    @Override
+    protected void onPlayerDeath(Player player) {
+        armed.remove(player.getUniqueId());
+        cooldowns.unprime(player, STRIKE_ID);
     }
 
     /** A disc in the air would be lost if the player left, so it comes home first. */
-    @EventHandler(priority = EventPriority.LOWEST)
-    public void onQuit(PlayerQuitEvent event) {
-        Player player = event.getPlayer();
+    @Override
+    protected void onPlayerQuit(Player player) {
         armed.remove(player.getUniqueId());
         ZeusDiscFlight flight = flights.get(player.getUniqueId());
         if (flight != null) flight.end();
-        cooldowns.hideAll(player);
     }
 
     /** Ends every flight (each disc goes back to its thrower); call from onDisable. */
@@ -143,7 +121,7 @@ public final class ZeusDiscListener implements Listener {
         PlayerInventory inventory = player.getInventory();
         int slot = hand == EquipmentSlot.OFF_HAND ? OFFHAND_SLOT : inventory.getHeldItemSlot();
         ItemStack held = inventory.getItem(slot);
-        if (!disc.isZeusDisc(held)) return;
+        if (!weapon.isWeapon(held)) return;
 
         ItemStack thrown = held.clone();
         thrown.setAmount(1);

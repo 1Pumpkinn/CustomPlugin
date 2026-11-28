@@ -1,28 +1,23 @@
 package net.rose.customPlugin.listener.axe;
 
+import net.rose.customPlugin.api.WeaponContext;
+import net.rose.customPlugin.api.AbilityListener;
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.rose.customPlugin.effect.AxeSpinEffect;
 import net.rose.customPlugin.effect.EruptionEffect;
 import net.rose.customPlugin.item.axe.VolcanicAxe;
-import net.rose.customPlugin.util.CooldownBars;
 import net.rose.customPlugin.util.Targets;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
-import org.bukkit.event.entity.PlayerDeathEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
-public final class VolcanicAxeListener implements Listener {
+public final class VolcanicAxeListener extends AbilityListener<VolcanicAxe> {
 
     private static final double ERUPTION_RANGE = 30.0;
     private static final double RAY_SIZE = 0.8;
@@ -32,15 +27,11 @@ public final class VolcanicAxeListener implements Listener {
     private static final String ERUPTION_ID = "volcanic_eruption";
     private static final String SPIN_ID = "volcanic_spin";
 
-    private final VolcanicAxe axe;
-    private final CooldownBars cooldowns;
     private final EruptionEffect eruption;
     private final AxeSpinEffect spin;
 
-    public VolcanicAxeListener(VolcanicAxe axe, CooldownBars cooldowns,
-                               EruptionEffect eruption, AxeSpinEffect spin) {
-        this.axe = axe;
-        this.cooldowns = cooldowns;
+    public VolcanicAxeListener(WeaponContext context, VolcanicAxe axe, EruptionEffect eruption, AxeSpinEffect spin) {
+        super(context, axe);
         this.eruption = eruption;
         this.spin = spin;
     }
@@ -49,35 +40,23 @@ public final class VolcanicAxeListener implements Listener {
      * Offhand key (F) while holding the Volcanic Axe:
      * normal = Eruption under the target you look at, crouching = spinning axe.
      */
-    @EventHandler(ignoreCancelled = true)
-    public void onSwapHand(PlayerSwapHandItemsEvent event) {
-        Player player = event.getPlayer();
-        if (!axe.isVolcanicAxe(player.getInventory().getItemInMainHand())) return;
-
-        event.setCancelled(true);
-
-        if (player.isSneaking()) {
+    @Override
+    protected void onOffhand(Player player, boolean sneaking) {
+        if (sneaking) {
             useSpin(player);
         } else {
             useEruption(player);
         }
     }
 
-    @EventHandler
-    public void onDeath(PlayerDeathEvent event) {
-        spin.stop(event.getEntity());
-    }
-
-    @EventHandler
-    public void onJoin(PlayerJoinEvent event) {
-        cooldowns.resume(event.getPlayer());
-    }
-
-    @EventHandler
-    public void onQuit(PlayerQuitEvent event) {
-        Player player = event.getPlayer();
+    @Override
+    protected void onPlayerDeath(Player player) {
         spin.stop(player);
-        cooldowns.hideAll(player);
+    }
+
+    @Override
+    protected void onPlayerQuit(Player player) {
+        spin.stop(player);
     }
 
     // ---------------------------------------------------------------- Abilities

@@ -1,11 +1,12 @@
 package net.rose.customPlugin.listener.mace;
 
+import net.rose.customPlugin.api.WeaponContext;
+import net.rose.customPlugin.api.AbilityListener;
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.rose.customPlugin.effect.ChainEffects;
 import net.rose.customPlugin.item.mace.MetalicMace;
-import net.rose.customPlugin.util.CooldownBars;
 import net.rose.customPlugin.util.Targets;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
@@ -16,20 +17,15 @@ import org.bukkit.entity.Player;
 import org.bukkit.entity.WindCharge;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.player.PlayerSwapHandItemsEvent;
-import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
 import java.util.Comparator;
 
-public final class MetalicMaceListener implements Listener {
+public final class MetalicMaceListener extends AbilityListener<MetalicMace> {
 
     private static final int PULL_RANGE = 20;
     private static final double AIM_RAY_SIZE = 1.5;         // fat ray: the crosshair only has to pass near the target
@@ -49,15 +45,10 @@ public final class MetalicMaceListener implements Listener {
 
     private static final String PULL_ID = "chain_pull";
 
-    private final JavaPlugin plugin;
-    private final MetalicMace mace;
-    private final CooldownBars cooldowns;
     private final ChainEffects chains;
 
-    public MetalicMaceListener(JavaPlugin plugin, MetalicMace mace, CooldownBars cooldowns, ChainEffects chains) {
-        this.plugin = plugin;
-        this.mace = mace;
-        this.cooldowns = cooldowns;
+    public MetalicMaceListener(WeaponContext context, MetalicMace mace, ChainEffects chains) {
+        super(context, mace);
         this.chains = chains;
     }
 
@@ -65,12 +56,8 @@ public final class MetalicMaceListener implements Listener {
      * Offhand key (F) while holding the Metalic Mace pulls the player or mob you're looking at, or, if you aren't
      * looking at one, chains you to the block you're looking at and pulls you to it. The swap itself is always cancelled.
      */
-    @EventHandler(ignoreCancelled = true)
-    public void onSwapHand(PlayerSwapHandItemsEvent event) {
-        Player player = event.getPlayer();
-        if (!mace.isMetalicMace(player.getInventory().getItemInMainHand())) return;
-
-        event.setCancelled(true);
+    @Override
+    protected void onOffhand(Player player, boolean sneaking) {
         pull(player);
     }
 
@@ -91,16 +78,9 @@ public final class MetalicMaceListener implements Listener {
         if (chains.isChained(shooter)) event.setCancelled(true);
     }
 
-    @EventHandler
-    public void onJoin(PlayerJoinEvent event) {
-        cooldowns.resume(event.getPlayer());
-    }
-
-    @EventHandler
-    public void onQuit(PlayerQuitEvent event) {
-        Player player = event.getPlayer();
+    @Override
+    protected void onPlayerQuit(Player player) {
         chains.clear(player);
-        cooldowns.hideAll(player);
     }
 
     /**

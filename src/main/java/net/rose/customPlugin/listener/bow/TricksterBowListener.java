@@ -1,8 +1,9 @@
 package net.rose.customPlugin.listener.bow;
 
+import net.rose.customPlugin.api.WeaponContext;
+import net.rose.customPlugin.api.AbilityListener;
 import net.kyori.adventure.bossbar.BossBar;
 import net.rose.customPlugin.item.bow.TricksterBow;
-import net.rose.customPlugin.util.CooldownBars;
 import net.rose.customPlugin.util.Targets;
 import net.rose.customPlugin.util.TrueDamage;
 import org.bukkit.FluidCollisionMode;
@@ -18,20 +19,14 @@ import org.bukkit.entity.Player;
 import org.bukkit.entity.Tameable;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
-import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
-import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
@@ -45,7 +40,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.concurrent.ThreadLocalRandom;
 
-public final class TricksterBowListener implements Listener {
+public final class TricksterBowListener extends AbilityListener<TricksterBow> {
 
     private static final int EXTRA_ARROWS = 2;               // 3 arrows per shot with the real one
     private static final double SPREAD_DEGREES = 6.0;
@@ -68,30 +63,21 @@ public final class TricksterBowListener implements Listener {
     private static final long SHOT_COOLDOWN_MS = 15_000;
     private static final String SHOT_ID = "trickster_shot";
 
-    private final JavaPlugin plugin;
-    private final TricksterBow bow;
-    private final CooldownBars cooldowns;
     private final Set<UUID> armed = new HashSet<>();
     private final NamespacedKey bouncesKey;
     private final NamespacedKey hitKey;
     private final NamespacedKey primedKey;
 
-    public TricksterBowListener(JavaPlugin plugin, TricksterBow bow, CooldownBars cooldowns) {
-        this.plugin = plugin;
-        this.bow = bow;
-        this.cooldowns = cooldowns;
-        this.bouncesKey = new NamespacedKey(plugin, "trickster_bounces");
-        this.hitKey = new NamespacedKey(plugin, "trickster_hit");
-        this.primedKey = new NamespacedKey(plugin, "trickster_primed");
+    public TricksterBowListener(WeaponContext context, TricksterBow bow) {
+        super(context, bow);
+        this.bouncesKey = key("trickster_bounces");
+        this.hitKey = key("trickster_hit");
+        this.primedKey = key("trickster_primed");
     }
 
     /** Offhand key (F) while holding the Trickster Bow primes the next shot. The swap itself is always cancelled. */
-    @EventHandler(ignoreCancelled = true)
-    public void onSwapHand(PlayerSwapHandItemsEvent event) {
-        Player player = event.getPlayer();
-        if (!bow.isTricksterBow(player.getInventory().getItemInMainHand())) return;
-
-        event.setCancelled(true);
+    @Override
+    protected void onOffhand(Player player, boolean sneaking) {
         prime(player);
     }
 
@@ -102,7 +88,7 @@ public final class TricksterBowListener implements Listener {
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onShoot(EntityShootBowEvent event) {
         if (!(event.getEntity() instanceof Player shooter)) return;
-        if (!bow.isTricksterBow(event.getBow())) return;
+        if (!weapon.isWeapon(event.getBow())) return;
         if (!(event.getProjectile() instanceof Arrow main)) return;
 
         if (!armed.remove(shooter.getUniqueId())) {
@@ -206,27 +192,20 @@ public final class TricksterBowListener implements Listener {
     /** Dropping the weapon cancels a primed ability, so its boss bar doesn't stay behind. */
     @EventHandler(ignoreCancelled = true)
     public void onDrop(PlayerDropItemEvent event) {
-        if (!bow.isTricksterBow(event.getItemDrop().getItemStack())) return;
+        if (!weapon.isWeapon(event.getItemDrop().getItemStack())) return;
         Player player = event.getPlayer();
         if (armed.remove(player.getUniqueId())) cooldowns.unprime(player, SHOT_ID);
     }
 
-    @EventHandler
-    public void onDeath(PlayerDeathEvent event) {
-        armed.remove(event.getEntity().getUniqueId());
-        cooldowns.unprime(event.getEntity(), SHOT_ID);
-    }
-
-    @EventHandler
-    public void onJoin(PlayerJoinEvent event) {
-        cooldowns.resume(event.getPlayer());
-    }
-
-    @EventHandler
-    public void onQuit(PlayerQuitEvent event) {
-        Player player = event.getPlayer();
+    @Override
+    protected void onPlayerDeath(Player player) {
         armed.remove(player.getUniqueId());
-        cooldowns.hideAll(player);
+        cooldowns.unprime(player, SHOT_ID);
+    }
+
+    @Override
+    protected void onPlayerQuit(Player player) {
+        armed.remove(player.getUniqueId());
     }
 
     private void prime(Player player) {

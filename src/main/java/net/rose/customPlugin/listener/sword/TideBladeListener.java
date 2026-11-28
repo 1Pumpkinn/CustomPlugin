@@ -1,8 +1,9 @@
 package net.rose.customPlugin.listener.sword;
 
+import net.rose.customPlugin.api.WeaponContext;
+import net.rose.customPlugin.api.AbilityListener;
 import net.kyori.adventure.bossbar.BossBar;
 import net.rose.customPlugin.item.sword.TideBlade;
-import net.rose.customPlugin.util.CooldownBars;
 import net.rose.customPlugin.util.DeathMessages;
 import net.rose.customPlugin.util.Targets;
 import net.rose.customPlugin.util.TrueDamage;
@@ -13,14 +14,8 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.player.PlayerSwapHandItemsEvent;
-import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -30,7 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-public final class TideBladeListener implements Listener {
+public final class TideBladeListener extends AbilityListener<TideBlade> {
 
     // --- Drown ---
     private static final int DROWN_DURATION_TICKS = 160;     // 8s total
@@ -41,32 +36,19 @@ public final class TideBladeListener implements Listener {
 
     private static final String DROWN_ID = "drown";
 
-    private final JavaPlugin plugin;
-    private final TideBlade tideBlade;
-    private final CooldownBars cooldowns;
     private final DeathMessages deaths;
 
     private final Set<UUID> armed = new HashSet<>();
     private final Map<UUID, BukkitTask> drowning = new HashMap<>();
 
-    public TideBladeListener(JavaPlugin plugin, TideBlade tideBlade, CooldownBars cooldowns, DeathMessages deaths) {
-        this.plugin = plugin;
-        this.tideBlade = tideBlade;
-        this.cooldowns = cooldowns;
-        this.deaths = deaths;
+    public TideBladeListener(WeaponContext context, TideBlade tideBlade) {
+        super(context, tideBlade);
+        this.deaths = context.deaths();
     }
 
-    /**
-     * Offhand key (F) while holding the Tide Blade:
-     * arms Drown. The swap itself is always cancelled.
-     */
-    @EventHandler(ignoreCancelled = true)
-    public void onSwapHand(PlayerSwapHandItemsEvent event) {
-        Player player = event.getPlayer();
-        if (!tideBlade.isTideBlade(player.getInventory().getItemInMainHand())) return;
-
-        event.setCancelled(true);
-
+    /** Offhand key (F) while holding the Tide Blade: arms Drown. */
+    @Override
+    protected void onOffhand(Player player, boolean sneaking) {
         armDrown(player);
     }
 
@@ -77,7 +59,7 @@ public final class TideBladeListener implements Listener {
         if (!Targets.isValidTarget(attacker, event.getEntity())) return;
         LivingEntity victim = (LivingEntity) event.getEntity();
         if (!armed.contains(attacker.getUniqueId())) return;
-        if (!tideBlade.isTideBlade(attacker.getInventory().getItemInMainHand())) return;
+        if (!weapon.isWeapon(attacker.getInventory().getItemInMainHand())) return;
 
         armed.remove(attacker.getUniqueId());
         cooldowns.unprime(attacker, DROWN_ID);
@@ -88,28 +70,21 @@ public final class TideBladeListener implements Listener {
     /** Dropping the weapon cancels a primed ability, so its boss bar doesn't stay behind. */
     @EventHandler(ignoreCancelled = true)
     public void onDrop(PlayerDropItemEvent event) {
-        if (!tideBlade.isTideBlade(event.getItemDrop().getItemStack())) return;
+        if (!weapon.isWeapon(event.getItemDrop().getItemStack())) return;
         Player player = event.getPlayer();
         if (armed.remove(player.getUniqueId())) cooldowns.unprime(player, DROWN_ID);
     }
 
-    @EventHandler
-    public void onDeath(PlayerDeathEvent event) {
-        armed.remove(event.getEntity().getUniqueId());
-        cooldowns.unprime(event.getEntity(), DROWN_ID);
+    @Override
+    protected void onPlayerDeath(Player player) {
+        armed.remove(player.getUniqueId());
+        cooldowns.unprime(player, DROWN_ID);
     }
 
-    @EventHandler
-    public void onJoin(PlayerJoinEvent event) {
-        cooldowns.resume(event.getPlayer());
-    }
-
-    @EventHandler
-    public void onQuit(PlayerQuitEvent event) {
-        Player player = event.getPlayer();
+    @Override
+    protected void onPlayerQuit(Player player) {
         armed.remove(player.getUniqueId());
         stopDrowning(player);
-        cooldowns.hideAll(player);
     }
 
     // ------------------------------------------------------------------ Drown

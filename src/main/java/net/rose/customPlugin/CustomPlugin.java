@@ -6,15 +6,7 @@ import net.rose.customPlugin.gui.ShopMenu;
 import net.rose.customPlugin.gui.WeaponPointsMenu;
 import net.rose.customPlugin.command.WeaponCommand;
 import net.rose.customPlugin.api.WeaponManager;
-import net.rose.customPlugin.effect.HatEffects;
-import net.rose.customPlugin.effect.VampireSweepEffect;
-import net.rose.customPlugin.effect.TempestSpinEffect;
-import net.rose.customPlugin.effect.AxeSpinEffect;
-import net.rose.customPlugin.effect.ChainEffects;
-import net.rose.customPlugin.effect.EruptionEffect;
 import net.rose.customPlugin.effect.FrostEffects;
-import net.rose.customPlugin.effect.PetalEffect;
-import net.rose.customPlugin.effect.ZeusLightning;
 import net.rose.customPlugin.item.Legendaries;
 import net.rose.customPlugin.item.WeaponRegistry;
 import net.rose.customPlugin.item.axe.VolcanicAxe;
@@ -29,18 +21,8 @@ import net.rose.customPlugin.item.spear.FrostSpear;
 import net.rose.customPlugin.item.sword.PetalBlade;
 import net.rose.customPlugin.item.sword.TideBlade;
 import net.rose.customPlugin.item.trident.TempestTrident;
-import net.rose.customPlugin.listener.axe.VolcanicAxeListener;
-import net.rose.customPlugin.listener.bow.TricksterBowListener;
-import net.rose.customPlugin.listener.disc.ZeusDiscListener;
-import net.rose.customPlugin.listener.mace.MetalicMaceListener;
-import net.rose.customPlugin.listener.disc.HatListener;
 import net.rose.customPlugin.listener.misc.StunListener;
 import net.rose.customPlugin.listener.player.*;
-import net.rose.customPlugin.listener.scythe.BloodthirstScytheListener;
-import net.rose.customPlugin.listener.spear.FrostSpearListener;
-import net.rose.customPlugin.listener.sword.PetalBladeListener;
-import net.rose.customPlugin.listener.sword.TideBladeListener;
-import net.rose.customPlugin.listener.trident.TempestTridentListener;
 import net.rose.customPlugin.pack.ResourcePackManager;
 import net.rose.customPlugin.command.ReloadCommand;
 import net.rose.customPlugin.command.WeaponPackCommand;
@@ -54,29 +36,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class CustomPlugin extends JavaPlugin {
 
     private KillToken killToken;
-    private TideBlade tideBlade;
-    private VolcanicAxe volcanicAxe;
-    private FrostSpear frostSpear;
-    private FrostEffects frostEffects;
-    private MetalicMace metalicMace;
-    private TricksterBow tricksterBow;
     private WeaponManager weaponManager;
-    private ZeusDisc zeusDisc;
     private ResourcePackManager packManager;
-    private ZeusDiscListener zeusDiscListener;
-    private ChainEffects chainEffects;
     private CooldownBars cooldownBars;
-    private EruptionEffect eruptionEffect;
-    private AxeSpinEffect axeSpinEffect;
-    private PetalBlade petalBlade;
-    private PetalEffect petalEffect;
-    private BloodthirstScythe bloodthirstScythe;
-    private TempestTrident tempestTrident;
-    private TempestSpinEffect tempestSpin;
-    private Hat hat;
-    private HatEffects hatEffects;
-    private HatListener hatListener;
-    private DeathMessages deathMessages;
+    private FrostEffects frostEffects;
     private WeaponLimitListener weaponLimit;
 
     @Override
@@ -88,63 +51,40 @@ public final class CustomPlugin extends JavaPlugin {
         saveConfig();
         new TrueDamage(this); // registers its listener; ability damage ignores armor, enchants and resistance
         this.killToken = new KillToken(this);
-        this.tideBlade = new TideBlade(this);
-        this.volcanicAxe = new VolcanicAxe(this);
-        this.frostSpear = new FrostSpear(this);
-        this.deathMessages = new DeathMessages();
-        this.frostEffects = new FrostEffects(this, deathMessages);
-        this.metalicMace = new MetalicMace(this);
-        this.tricksterBow = new TricksterBow(this);
-        this.zeusDisc = new ZeusDisc(this);
-        this.chainEffects = new ChainEffects(this);
+        DeathMessages deathMessages = new DeathMessages();
+        this.frostEffects = new FrostEffects(this, deathMessages); // shared by the Frost Spear and the stun listener
         this.cooldownBars = new CooldownBars(this);
-        this.eruptionEffect = new EruptionEffect(this, deathMessages);
-        this.axeSpinEffect = new AxeSpinEffect(this, deathMessages);
-        this.petalBlade = new PetalBlade(this);
-        this.petalEffect = new PetalEffect(this, deathMessages);
-        this.bloodthirstScythe = new BloodthirstScythe(this);
-        this.tempestTrident = new TempestTrident(this);
-        this.tempestSpin = new TempestSpinEffect(this, deathMessages);
-        this.hat = new Hat(this);
-        this.hatEffects = new HatEffects(this, hat, deathMessages);
 
         getServer().getPluginManager().registerEvents(new KillTokenListener(killToken), this);
         getServer().getPluginManager().registerEvents(deathMessages, this);
-        Legendaries legendaries = new Legendaries(this);
-        WeaponRegistry weaponRegistry = new WeaponRegistry(tideBlade, volcanicAxe, frostSpear, metalicMace, tricksterBow, zeusDisc, petalBlade, bloodthirstScythe, tempestTrident, hat);
+        Legendaries legendaries = new Legendaries();
+        WeaponRegistry weaponRegistry = new WeaponRegistry();
 
-        // Weapons built on the API (see docs/ADDING_A_WEAPON.md) are registered here, in one line each. This has to
-        // come before the weapon limit, dropped-item beacon and shop, which look weapons up when they start.
+        // Every weapon is built on the API (see docs/ADDING_A_WEAPON.md) and registered here, in one line each: the
+        // /weapon command, shop, weapon limit, beacon, lore, config entry and listener are all wired by register().
+        // This has to come before the weapon limit, dropped-item beacon and shop, which look weapons up when they start.
+        // The order is the order of /weapon, the shop and the weapon lists.
         this.weaponManager = new WeaponManager(this, legendaries, weaponRegistry, cooldownBars, deathMessages);
+        weaponManager.register(new TideBlade(this));
+        weaponManager.register(new VolcanicAxe(this));
+        weaponManager.register(new FrostSpear(this, frostEffects));
+        weaponManager.register(new MetalicMace(this));
+        weaponManager.register(new TricksterBow(this));
+        weaponManager.register(new ZeusDisc(this));
+        weaponManager.register(new PetalBlade(this));
+        weaponManager.register(new BloodthirstScythe(this));
+        weaponManager.register(new TempestTrident(this));
+        weaponManager.register(new Hat(this));
         weaponManager.register(new HuntersBow(this));
 
         getServer().getPluginManager().registerEvents(new LegendaryDeathListener(this, legendaries), this);
         this.weaponLimit = new WeaponLimitListener(this, legendaries);
         getServer().getPluginManager().registerEvents(weaponLimit, this);
-        getServer().getPluginManager().registerEvents(new TideBladeListener(this, tideBlade, cooldownBars, deathMessages), this);
         getServer().getPluginManager().registerEvents(new EgapListener(), this);
         getServer().getPluginManager().registerEvents(new StunListener(frostEffects), this);
-        getServer().getPluginManager().registerEvents(
-                new FrostSpearListener(this, frostSpear, cooldownBars, frostEffects), this);
-        getServer().getPluginManager().registerEvents(
-                new MetalicMaceListener(this, metalicMace, cooldownBars, chainEffects), this);
-        getServer().getPluginManager().registerEvents(new TricksterBowListener(this, tricksterBow, cooldownBars), this);
-        this.zeusDiscListener = new ZeusDiscListener(this, zeusDisc, cooldownBars,
-                new ZeusLightning(this, deathMessages), deathMessages);
-        getServer().getPluginManager().registerEvents(zeusDiscListener, this);
         new LungeCooldown(this).register();
         getServer().getPluginManager().registerEvents(new MaceDamageCap(), this);
         getServer().getPluginManager().registerEvents(new DroppedItemGlow(this, killToken, legendaries), this);
-        getServer().getPluginManager().registerEvents(
-                new VolcanicAxeListener(volcanicAxe, cooldownBars, eruptionEffect, axeSpinEffect), this);
-
-        getServer().getPluginManager().registerEvents(new PetalBladeListener(this, petalBlade, cooldownBars, petalEffect), this);
-        getServer().getPluginManager().registerEvents(
-                new BloodthirstScytheListener(bloodthirstScythe, cooldownBars, new VampireSweepEffect(deathMessages)), this);
-        getServer().getPluginManager().registerEvents(
-                new TempestTridentListener(this, tempestTrident, cooldownBars, tempestSpin), this);
-        this.hatListener = new HatListener(this, hat, cooldownBars, hatEffects, deathMessages);
-        getServer().getPluginManager().registerEvents(hatListener, this);
 
         // The pack is bundled in this jar and served by a built-in HTTP server (see resource-pack in config.yml).
         this.packManager = new ResourcePackManager(this, getFile());
@@ -192,52 +132,13 @@ public final class CustomPlugin extends JavaPlugin {
     public void onDisable() {
         if (packManager != null) packManager.stop();
         if (weaponLimit != null) weaponLimit.shutdown();
-        if (zeusDiscListener != null) zeusDiscListener.shutdown();
-        if (hatListener != null) hatListener.shutdown();
         if (cooldownBars != null) cooldownBars.shutdown();
-        if (eruptionEffect != null) eruptionEffect.removeAll();
-        if (axeSpinEffect != null) axeSpinEffect.removeAll();
-        if (petalEffect != null) petalEffect.removeAll();
-        if (tempestSpin != null) tempestSpin.removeAll();
-        if (hatEffects != null) hatEffects.removeAll();
         if (frostEffects != null) frostEffects.shutdown();
-        if (chainEffects != null) chainEffects.shutdown();
+        // Each weapon ends what it has running: flights, displays, tasks and its effects.
         if (weaponManager != null) weaponManager.shutdown();
     }
 
     public KillToken getKillToken() {
         return killToken;
-    }
-
-    public VolcanicAxe getVolcanicAxe() {
-        return volcanicAxe;
-    }
-
-    public FrostSpear getFrostSpear() {
-        return frostSpear;
-    }
-
-    public MetalicMace getMetalicMace() {
-        return metalicMace;
-    }
-
-    public TideBlade getTideBlade() {
-        return tideBlade;
-    }
-
-    public PetalBlade getPetalBlade() {
-        return petalBlade;
-    }
-
-    public Hat getHat() {
-        return hat;
-    }
-
-    public BloodthirstScythe getBloodthirstScythe() {
-        return bloodthirstScythe;
-    }
-
-    public TempestTrident getTempestTrident() {
-        return tempestTrident;
     }
 }

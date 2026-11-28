@@ -1,55 +1,74 @@
 package net.rose.customPlugin.item.disc;
 
 import io.papermc.paper.datacomponent.DataComponentTypes;
-import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
+import net.rose.customPlugin.api.Ability;
+import net.rose.customPlugin.api.CustomWeapon;
+import net.rose.customPlugin.api.WeaponContext;
+import net.rose.customPlugin.effect.ZeusLightning;
+import net.rose.customPlugin.listener.disc.ZeusDiscListener;
 import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
+import org.bukkit.event.Listener;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
 
-public final class ZeusDisc {
+public final class ZeusDisc extends CustomWeapon {
 
-    private final NamespacedKey key;
+    private final JavaPlugin plugin;
+    private ZeusDiscListener listener;
 
     public ZeusDisc(JavaPlugin plugin) {
-        this.key = new NamespacedKey(plugin, "zeus_disc");
+        // A music disc is a flat round sprite, so it reads as a disc while it spins (no resource pack needed).
+        super(plugin, "zeusdisc", "zeus_disc", "Zeus Disc", NamedTextColor.YELLOW, Material.MUSIC_DISC_13);
+        this.plugin = plugin;
     }
 
-    public ItemStack create() {
-        // A music disc is a flat round sprite, so it reads as a disc while it spins (no resource pack needed).
-        ItemStack item = new ItemStack(Material.MUSIC_DISC_13);
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(Component.text("Zeus Disc", NamedTextColor.YELLOW)
-                .decoration(TextDecoration.ITALIC, false));
-        meta.lore(List.of(
-                ability("Right-click", "Throw the disc. It ricochets off walls and flies back to you"),
-                ability("Offhand", "Prime your next throw to strike everything it hits with lightning"),
-                ability("Passive", "Hitting something near another target arcs sparks to nearby players and mobs for half a heart")
-        ));
-        meta.setEnchantmentGlintOverride(false); // no enchant glint on any weapon
-        meta.setItemModel(key); // texture pack model: customplugin:<name>
-        meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
-        item.setItemMeta(meta);
+    @Override
+    public List<Ability> abilities() {
+        return List.of(
+                Ability.of("Right-click", "Throw the disc. It ricochets off walls and flies back to you"),
+                Ability.offhand("Prime your next throw to strike everything it hits with lightning"),
+                Ability.passive("Hitting something near another target arcs sparks to nearby players and mobs for half a heart"));
+    }
 
+    @Override
+    public Listener createListener(WeaponContext context) {
+        this.listener = new ZeusDiscListener(context, this, new ZeusLightning(plugin, context.deaths()));
+        return listener;
+    }
+
+    @Override
+    protected boolean maxEnchanted() {
+        return false; // the disc carries no enchantments
+    }
+
+    @Override
+    protected void customize(ItemMeta meta) {
+        meta.setEnchantmentGlintOverride(false); // no enchant glint on any weapon
+    }
+
+    @Override
+    protected void finish(ItemStack item) {
         // No jukebox use, and no "C418 - 13" line in the tooltip.
         item.unsetData(DataComponentTypes.JUKEBOX_PLAYABLE);
-        return item;
     }
 
-    public boolean isZeusDisc(ItemStack item) {
-        if (item == null || !item.hasItemMeta()) return false;
-        return item.getItemMeta().getPersistentDataContainer().has(key, PersistentDataType.BYTE);
+    /** Ends every disc in the air (each goes back to its thrower). */
+    @Override
+    public void onDisable() {
+        if (listener != null) listener.shutdown();
     }
 
-    private static Component ability(String trigger, String description) {
-        return Component.text(trigger, NamedTextColor.YELLOW)
-                .append(Component.text(" - " + description, NamedTextColor.GRAY))
-                .decoration(TextDecoration.ITALIC, false);
+    @Override
+    public int defaultTier() {
+        return 2;
+    }
+
+    @Override
+    public int defaultPrice() {
+        return 48;
     }
 }

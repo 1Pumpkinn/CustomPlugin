@@ -1,50 +1,52 @@
 package net.rose.customPlugin.item.mace;
 
-import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
-import net.rose.customPlugin.util.MaxEnchants;
+import net.rose.customPlugin.api.Ability;
+import net.rose.customPlugin.api.CustomWeapon;
+import net.rose.customPlugin.api.WeaponContext;
+import net.rose.customPlugin.effect.ChainEffects;
+import net.rose.customPlugin.listener.mace.MetalicMaceListener;
 import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
 
-public final class MetalicMace {
+public final class MetalicMace extends CustomWeapon {
 
-    private final NamespacedKey key;
+    private final JavaPlugin plugin;
+    private ChainEffects chains;
 
     public MetalicMace(JavaPlugin plugin) {
-        this.key = new NamespacedKey(plugin, "metalic_mace");
+        super(plugin, "metalicmace", "metalic_mace", "Metalic Mace", NamedTextColor.GRAY, Material.MACE);
+        this.plugin = plugin;
     }
 
-    public ItemStack create() {
-        ItemStack item = new ItemStack(Material.MACE);
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(Component.text("Metalic Mace", NamedTextColor.GRAY)
-                .decoration(TextDecoration.ITALIC, false));
-        meta.lore(List.of(
-                ability("Offhand", "Pull a player or mob in with a chain, or look at a block to chain yourself to it and pull yourself there"),
-                ability("Chain", "The pulled target is slowed for 8s and can't jump or use wind charges")
-        ));
-        meta.setItemModel(key); // texture pack model: customplugin:<name>
-        meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
-        item.setItemMeta(meta);
-        MaxEnchants.apply(item); // weapons always come fully enchanted
-        return item;
+    @Override
+    public List<Ability> abilities() {
+        return List.of(
+                Ability.offhand("Pull a player or mob in with a chain, or look at a block to chain yourself to it and pull yourself there"),
+                Ability.of("Chain", "The pulled target is slowed for 8s and can't jump or use wind charges"));
     }
 
-    public boolean isMetalicMace(ItemStack item) {
-        if (item == null || !item.hasItemMeta()) return false;
-        return item.getItemMeta().getPersistentDataContainer().has(key, PersistentDataType.BYTE);
+    @Override
+    public Listener createListener(WeaponContext context) {
+        this.chains = new ChainEffects(plugin);
+        return new MetalicMaceListener(context, this, chains);
     }
 
-    private static Component ability(String trigger, String description) {
-        return Component.text(trigger, NamedTextColor.WHITE)
-                .append(Component.text(" - " + description, NamedTextColor.GRAY))
-                .decoration(TextDecoration.ITALIC, false);
+    @Override
+    public void onDisable() {
+        if (chains != null) chains.shutdown();
+    }
+
+    @Override
+    public int defaultTier() {
+        return 1;
+    }
+
+    @Override
+    public int defaultPrice() {
+        return 80;
     }
 }

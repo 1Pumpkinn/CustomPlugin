@@ -1,22 +1,16 @@
 package net.rose.customPlugin.item;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
-import net.rose.customPlugin.item.misc.Hat;
-import net.rose.customPlugin.item.scythe.BloodthirstScythe;
-import net.rose.customPlugin.item.sword.PetalBlade;
-import net.rose.customPlugin.item.trident.TempestTrident;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
-import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.ArrayList;
 import java.util.List;
 
-/** Every custom weapon in the plugin, so something can ask which of them a player is carrying. */
+/** Every custom weapon in the plugin (added by {@code WeaponManager.register}), so something can ask which of them a player is carrying. */
 public final class Legendaries {
 
     /** A custom weapon: {@code id} is its /weapon name (also the key in config.yml), {@code color} its signature color. */
@@ -28,21 +22,11 @@ public final class Legendaries {
 
     private final List<Entry> entries;
 
-    public Legendaries(JavaPlugin plugin) {
-        this.entries = new ArrayList<>(List.of(
-                entry(plugin, "tide_blade", "tideblade", "Tide Blade", NamedTextColor.AQUA),
-                entry(plugin, "volcanic_axe", "volcanicaxe", "Volcanic Axe", NamedTextColor.GOLD),
-                entry(plugin, "frost_spear", "frostspear", "Frost Spear", NamedTextColor.AQUA),
-                entry(plugin, "metalic_mace", "metalicmace", "Metalic Mace", NamedTextColor.GRAY),
-                entry(plugin, "trickster_bow", "tricksterbow", "Trickster Bow", NamedTextColor.LIGHT_PURPLE),
-                entry(plugin, "zeus_disc", "zeusdisc", "Zeus Disc", NamedTextColor.YELLOW),
-                entry(plugin, "petal_blade", "petalblade", "Petal Blade", PetalBlade.PINK),
-                entry(plugin, "bloodthirst_scythe", "bloodthirstscythe", "Bloodthirst Scythe", BloodthirstScythe.BLOOD),
-                entry(plugin, "tempest_trident", "tempesttrident", "Tempest Trident", TempestTrident.COLOR),
-                entry(plugin, "hat", "hat", "Hat", Hat.COLOR)));
+    public Legendaries() {
+        this.entries = new ArrayList<>();
     }
 
-    /** Adds a weapon made through the API (see WeaponManager). Weapons added here count everywhere the built-in ones do. */
+    /** Adds a weapon (done for you by WeaponManager.register). Every weapon added here counts for the weapon limit, death notice and dropped-item beacon. */
     public void register(NamespacedKey key, String id, String name, TextColor color) {
         entries.add(new Entry(key, new Weapon(id, name, color)));
     }
@@ -73,9 +57,5 @@ public final class Legendaries {
     private static boolean has(ItemStack stack, NamespacedKey key) {
         if (stack == null || !stack.hasItemMeta()) return false;
         return stack.getItemMeta().getPersistentDataContainer().has(key, PersistentDataType.BYTE);
-    }
-
-    private static Entry entry(JavaPlugin plugin, String key, String id, String name, TextColor color) {
-        return new Entry(new NamespacedKey(plugin, key), new Weapon(id, name, color));
     }
 }

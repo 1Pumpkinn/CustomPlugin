@@ -1,9 +1,10 @@
 package net.rose.customPlugin.listener.trident;
 
+import net.rose.customPlugin.api.WeaponContext;
+import net.rose.customPlugin.api.AbilityListener;
 import net.kyori.adventure.bossbar.BossBar;
 import net.rose.customPlugin.effect.TempestSpinEffect;
 import net.rose.customPlugin.item.trident.TempestTrident;
-import net.rose.customPlugin.util.CooldownBars;
 import net.rose.customPlugin.util.Targets;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -15,16 +16,10 @@ import org.bukkit.entity.Player;
 import org.bukkit.entity.Trident;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
-import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,7 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-public final class TempestTridentListener implements Listener {
+public final class TempestTridentListener extends AbilityListener<TempestTrident> {
 
     private static final long THROW_COOLDOWN_MS = 30_000;
     private static final String THROW_ID = "tempest_throw";
@@ -43,30 +38,20 @@ public final class TempestTridentListener implements Listener {
     private record Empowered(UUID thrower, long at) {
     }
 
-    private final JavaPlugin plugin;
-    private final TempestTrident trident;
-    private final CooldownBars cooldowns;
     private final TempestSpinEffect spin;
 
     private final Set<UUID> armed = new HashSet<>();
     /** Tridents in flight that carry the ability: trident entity id -> who threw it. */
     private final Map<UUID, Empowered> empowered = new HashMap<>();
 
-    public TempestTridentListener(JavaPlugin plugin, TempestTrident trident, CooldownBars cooldowns,
-                                  TempestSpinEffect spin) {
-        this.plugin = plugin;
-        this.trident = trident;
-        this.cooldowns = cooldowns;
+    public TempestTridentListener(WeaponContext context, TempestTrident trident, TempestSpinEffect spin) {
+        super(context, trident);
         this.spin = spin;
     }
 
     /** Offhand key (F) while holding the Tempest Trident primes the next throw. The swap itself is always cancelled. */
-    @EventHandler(ignoreCancelled = true)
-    public void onSwapHand(PlayerSwapHandItemsEvent event) {
-        Player player = event.getPlayer();
-        if (!trident.isTempestTrident(player.getInventory().getItemInMainHand())) return;
-
-        event.setCancelled(true);
+    @Override
+    protected void onOffhand(Player player, boolean sneaking) {
         if (cooldowns.isOnCooldown(player, THROW_ID)) return; // boss bar already shows the time left
         if (!armed.add(player.getUniqueId())) return;
 
@@ -79,7 +64,7 @@ public final class TempestTridentListener implements Listener {
     public void onLaunch(ProjectileLaunchEvent event) {
         if (!(event.getEntity() instanceof Trident thrown)) return;
         if (!(thrown.getShooter() instanceof Player player)) return;
-        if (!trident.isTempestTrident(thrown.getItemStack())) return;
+        if (!weapon.isWeapon(thrown.getItemStack())) return;
         if (!armed.remove(player.getUniqueId())) return;
 
         cooldowns.unprime(player, THROW_ID);
@@ -124,26 +109,19 @@ public final class TempestTridentListener implements Listener {
     /** Dropping the weapon cancels a primed ability, so its boss bar doesn't stay behind. */
     @EventHandler(ignoreCancelled = true)
     public void onDrop(PlayerDropItemEvent event) {
-        if (!trident.isTempestTrident(event.getItemDrop().getItemStack())) return;
+        if (!weapon.isWeapon(event.getItemDrop().getItemStack())) return;
         Player player = event.getPlayer();
         if (armed.remove(player.getUniqueId())) cooldowns.unprime(player, THROW_ID);
     }
 
-    @EventHandler
-    public void onDeath(PlayerDeathEvent event) {
-        armed.remove(event.getEntity().getUniqueId());
-        cooldowns.unprime(event.getEntity(), THROW_ID);
-    }
-
-    @EventHandler
-    public void onJoin(PlayerJoinEvent event) {
-        cooldowns.resume(event.getPlayer());
-    }
-
-    @EventHandler
-    public void onQuit(PlayerQuitEvent event) {
-        Player player = event.getPlayer();
+    @Override
+    protected void onPlayerDeath(Player player) {
         armed.remove(player.getUniqueId());
-        cooldowns.hideAll(player);
+        cooldowns.unprime(player, THROW_ID);
+    }
+
+    @Override
+    protected void onPlayerQuit(Player player) {
+        armed.remove(player.getUniqueId());
     }
 }

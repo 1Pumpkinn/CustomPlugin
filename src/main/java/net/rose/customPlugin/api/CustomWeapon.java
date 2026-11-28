@@ -13,6 +13,7 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Base class for a custom weapon. Describe the weapon here and {@link WeaponManager#register} does the rest:
@@ -83,8 +84,17 @@ public abstract class CustomWeapon {
         return true;
     }
 
+    /** Enchantments (by key, e.g. {@code "fire_aspect"}) the automatic max enchants leave off this weapon. */
+    protected Set<String> skippedEnchants() {
+        return Set.of();
+    }
+
     /** Last chance to change the item's meta (attributes, flags, unbreakable...) before it is finished. */
     protected void customize(ItemMeta meta) {
+    }
+
+    /** Runs once the item is complete: for what the meta can't reach (data components such as the jukebox one). */
+    protected void finish(ItemStack item) {
     }
 
     /** Called from the plugin's onDisable: end anything the weapon has running (displays, tasks, state). */
@@ -103,13 +113,17 @@ public abstract class CustomWeapon {
         meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
         customize(meta);
         item.setItemMeta(meta);
-        if (maxEnchanted()) MaxEnchants.apply(item); // weapons always come fully enchanted
+        if (maxEnchanted()) MaxEnchants.apply(item, skippedEnchants()); // weapons always come fully enchanted
+        finish(item);
         return item;
     }
 
-    /** Whether the stack is this weapon. Safe to call with null or air. */
+    /**
+     * Whether the stack is this weapon. Safe to call with null or air. The type is checked first because some
+     * weapons are asked about every tick for every online player, and getItemMeta() copies the meta.
+     */
     public final boolean isWeapon(ItemStack item) {
-        if (item == null || !item.hasItemMeta()) return false;
+        if (item == null || item.getType() != material || !item.hasItemMeta()) return false;
         return item.getItemMeta().getPersistentDataContainer().has(key, PersistentDataType.BYTE);
     }
 
