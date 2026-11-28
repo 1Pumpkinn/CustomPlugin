@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/bow",
+  "textures": {
+    "layer0": "customplugin:item/hunters_bow_pulling_1"
+  }
+}

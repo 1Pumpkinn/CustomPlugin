@@ -1,6 +1,7 @@
 package net.rose.customPlugin.item;
 
 import net.rose.customPlugin.item.axe.VolcanicAxe;
+import net.rose.customPlugin.item.bow.HuntersBow;
 import net.rose.customPlugin.item.bow.TricksterBow;
 import net.rose.customPlugin.item.disc.ZeusDisc;
 import net.rose.customPlugin.item.mace.MetalicMace;
@@ -25,13 +26,14 @@ public final class WeaponRegistry {
     private final Map<String, Supplier<ItemStack>> weapons = new LinkedHashMap<>();
 
     public WeaponRegistry(TideBlade tideBlade, VolcanicAxe volcanicAxe, FrostSpear frostSpear, MetalicMace metalicMace,
-                          TricksterBow tricksterBow, ZeusDisc zeusDisc, PetalBlade petalBlade,
+                          TricksterBow tricksterBow, HuntersBow huntersBow, ZeusDisc zeusDisc, PetalBlade petalBlade,
                           BloodthirstScythe bloodthirstScythe, TempestTrident tempestTrident, Hat hat) {
         register("tideblade", tideBlade::create);
         register("volcanicaxe", volcanicAxe::create);
         register("frostspear", frostSpear::create);
         register("metalicmace", metalicMace::create);
         register("tricksterbow", tricksterBow::create);
+        register("huntersbow", huntersBow::create);
         register("zeusdisc", zeusDisc::create);
         register("petalblade", petalBlade::create);
         register("bloodthirstscythe", bloodthirstScythe::create);

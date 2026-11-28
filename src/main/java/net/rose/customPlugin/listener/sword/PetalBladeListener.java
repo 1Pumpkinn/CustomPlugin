@@ -25,6 +25,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class PetalBladeListener implements Listener, PetalEffect.Callbacks {
 
     private static final String PETALS_ID = "petal_blade";
+    private static final long PETALS_COOLDOWN_MS = 30_000;
 
     private final JavaPlugin plugin;
     private final PetalBlade blade;
@@ -89,7 +90,7 @@ public final class PetalBladeListener implements Listener, PetalEffect.Callbacks
 
         petals.cancel(player);
         cooldowns.unprime(player, PETALS_ID);
-        cooldowns.start(player, PETALS_ID, "Petal Blade", BossBar.Color.PINK, petalsCooldownMs());
+        cooldowns.start(player, PETALS_ID, "Petal Blade", BossBar.Color.PINK, PETALS_COOLDOWN_MS);
     }
 
     @EventHandler
@@ -103,7 +104,7 @@ public final class PetalBladeListener implements Listener, PetalEffect.Callbacks
         Player player = event.getPlayer();
         if (petals.isActive(player)) {
             petals.cancel(player);
-            cooldowns.start(player, PETALS_ID, "Petal Blade", BossBar.Color.PINK, petalsCooldownMs());
+            cooldowns.start(player, PETALS_ID, "Petal Blade", BossBar.Color.PINK, PETALS_COOLDOWN_MS);
         }
         cooldowns.hideAll(player);
     }
@@ -116,7 +117,7 @@ public final class PetalBladeListener implements Listener, PetalEffect.Callbacks
     @Override
     public void onSwarmEnded(Player owner) {
         cooldowns.unprime(owner, PETALS_ID);
-        cooldowns.start(owner, PETALS_ID, "Petal Blade", BossBar.Color.PINK, petalsCooldownMs());
+        cooldowns.start(owner, PETALS_ID, "Petal Blade", BossBar.Color.PINK, PETALS_COOLDOWN_MS);
     }
 
     private void summon(Player player) {
@@ -126,11 +127,6 @@ public final class PetalBladeListener implements Listener, PetalEffect.Callbacks
         petals.summon(player, this);
         cooldowns.prime(player, PETALS_ID, "Petal Blade", BossBar.Color.PINK);
         cooldowns.updatePrimed(player, PETALS_ID, primedTitle(PetalEffect.PETAL_COUNT), 1f);
-    }
-
-    /** {@code petal-blade.cooldown-seconds} from config.yml. */
-    private long petalsCooldownMs() {
-        return Math.max(0L, (long) (plugin.getConfig().getDouble("petal-blade.cooldown-seconds", 30.0) * 1000));
     }
 
     private static Component primedTitle(int remaining) {

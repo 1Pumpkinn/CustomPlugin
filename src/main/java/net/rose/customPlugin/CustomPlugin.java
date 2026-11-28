@@ -17,6 +17,7 @@ import net.rose.customPlugin.effect.ZeusLightning;
 import net.rose.customPlugin.item.Legendaries;
 import net.rose.customPlugin.item.WeaponRegistry;
 import net.rose.customPlugin.item.axe.VolcanicAxe;
+import net.rose.customPlugin.item.bow.HuntersBow;
 import net.rose.customPlugin.item.bow.TricksterBow;
 import net.rose.customPlugin.item.disc.ZeusDisc;
 import net.rose.customPlugin.item.mace.MetalicMace;
@@ -28,6 +29,7 @@ import net.rose.customPlugin.item.sword.PetalBlade;
 import net.rose.customPlugin.item.sword.TideBlade;
 import net.rose.customPlugin.item.trident.TempestTrident;
 import net.rose.customPlugin.listener.axe.VolcanicAxeListener;
+import net.rose.customPlugin.listener.bow.HuntersBowListener;
 import net.rose.customPlugin.listener.bow.TricksterBowListener;
 import net.rose.customPlugin.listener.disc.ZeusDiscListener;
 import net.rose.customPlugin.listener.mace.MetalicMaceListener;
@@ -58,6 +60,7 @@ public final class CustomPlugin extends JavaPlugin {
     private FrostEffects frostEffects;
     private MetalicMace metalicMace;
     private TricksterBow tricksterBow;
+    private HuntersBow huntersBow;
     private ZeusDisc zeusDisc;
     private ResourcePackManager packManager;
     private ZeusDiscListener zeusDiscListener;
@@ -92,6 +95,7 @@ public final class CustomPlugin extends JavaPlugin {
         this.frostEffects = new FrostEffects(this, deathMessages);
         this.metalicMace = new MetalicMace(this);
         this.tricksterBow = new TricksterBow(this);
+        this.huntersBow = new HuntersBow(this);
         this.zeusDisc = new ZeusDisc(this);
         this.chainEffects = new ChainEffects(this);
         this.cooldownBars = new CooldownBars(this);
@@ -119,6 +123,7 @@ public final class CustomPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(
                 new MetalicMaceListener(this, metalicMace, cooldownBars, chainEffects), this);
         getServer().getPluginManager().registerEvents(new TricksterBowListener(this, tricksterBow, cooldownBars), this);
+        getServer().getPluginManager().registerEvents(new HuntersBowListener(this, huntersBow, cooldownBars), this);
         this.zeusDiscListener = new ZeusDiscListener(this, zeusDisc, cooldownBars,
                 new ZeusLightning(this, deathMessages), deathMessages);
         getServer().getPluginManager().registerEvents(zeusDiscListener, this);
@@ -153,7 +158,7 @@ public final class CustomPlugin extends JavaPlugin {
             reloadCommand.setTabCompleter(reload);
         }
 
-        WeaponRegistry weaponRegistry = new WeaponRegistry(tideBlade, volcanicAxe, frostSpear, metalicMace, tricksterBow, zeusDisc, petalBlade, bloodthirstScythe, tempestTrident, hat);
+        WeaponRegistry weaponRegistry = new WeaponRegistry(tideBlade, volcanicAxe, frostSpear, metalicMace, tricksterBow, huntersBow, zeusDisc, petalBlade, bloodthirstScythe, tempestTrident, hat);
         WeaponCommand weaponCommand = new WeaponCommand(weaponRegistry);
         PluginCommand command = getCommand("weapon");
         if (command != null) {

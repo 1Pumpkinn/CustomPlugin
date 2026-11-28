@@ -3,6 +3,7 @@ package net.rose.customPlugin.item;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
+import net.rose.customPlugin.item.bow.HuntersBow;
 import net.rose.customPlugin.item.misc.Hat;
 import net.rose.customPlugin.item.scythe.BloodthirstScythe;
 import net.rose.customPlugin.item.sword.PetalBlade;
@@ -35,6 +36,7 @@ public final class Legendaries {
                 entry(plugin, "frost_spear", "frostspear", "Frost Spear", NamedTextColor.AQUA),
                 entry(plugin, "metalic_mace", "metalicmace", "Metalic Mace", NamedTextColor.GRAY),
                 entry(plugin, "trickster_bow", "tricksterbow", "Trickster Bow", NamedTextColor.LIGHT_PURPLE),
+                entry(plugin, "hunters_bow", "huntersbow", "Hunter's Bow", HuntersBow.COLOR),
                 entry(plugin, "zeus_disc", "zeusdisc", "Zeus Disc", NamedTextColor.YELLOW),
                 entry(plugin, "petal_blade", "petalblade", "Petal Blade", PetalBlade.PINK),
                 entry(plugin, "bloodthirst_scythe", "bloodthirstscythe", "Bloodthirst Scythe", BloodthirstScythe.BLOOD),

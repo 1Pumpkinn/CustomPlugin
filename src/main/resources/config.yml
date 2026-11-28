@@ -32,11 +32,11 @@ dropped-item-beacon:
   interval-ticks: 10
 
 # Bumped by the plugin when this file's layout changes. Don't edit it. (An older config.yml is backed up to
-# config-backup-v1.yml and upgraded on startup; your values are carried over.)
-config-version: 2
+# config-backup-v<old version>.yml and upgraded on startup; your values are carried over.)
+config-version: 3
 
 # After editing anything in this file run  /customplugin reload  (or restart). /customplugin reset puts the defaults back. No need to restart for tiers,
-# points, prices or the Hat / Petal Blade settings. Dropped-item beacon and resource-pack settings need
+# points or prices. Dropped-item beacon and resource-pack settings need
 # /weaponpack reload or a restart.
 
 # =====================================================================================================================
@@ -60,6 +60,9 @@ weapons:
     tier: 2
     price: 32
   tricksterbow:
+    tier: 2
+    price: 32
+  huntersbow:
     tier: 2
     price: 32
   zeusdisc:
@@ -107,26 +110,3 @@ shop:
     3: 2
   # Price for a tier that is not listed above.
   default-price: 5
-
-# Old Man's Hat. F (offhand key) throws the bounce hat; Crouch + F throws the razor hat.
-hat:
-  bounce:
-    # Upward launch speed, in blocks per tick (1.6 is roughly a 20+ block jump).
-    vertical-boost: 1.6
-    # Extra push in the direction the bouncer is facing, in blocks per tick. 0 = straight up.
-    horizontal-boost: 1.4
-    # A bounce hat that has flown further than this many blocks from the thrower freezes in the air
-    # and works as a jump pad right where it is. Set to 0 to turn this off.
-    freeze-distance: 5.0
-    # How long the pad stays out once it has landed or frozen, in ticks (20 ticks = 1 second).
-    lifetime-ticks: 50
-    cooldown-seconds: 20
-
-# Petal Blade.
-petal-blade:
-  # Show the cherry-leaf petals circling the player (and the cherry leaf particles and sounds) after priming.
-  # false = priming shows only the boss bar. Thrown petals are always visible.
-
-  show-orbiting-petals: true
-  cooldown-seconds: 30
-

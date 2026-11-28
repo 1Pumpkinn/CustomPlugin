@@ -10,7 +10,7 @@ authors: [ PumpkinDev ]
 
 commands:
   customplugin:
-    description: Reload or reset config.yml (weapon tiers, prices, points, hat and petal settings)
+    description: Reload or reset config.yml (weapon tiers, prices and points)
     usage: /customplugin <reload|reset>
     permission: customplugin.reload
 

@@ -69,7 +69,7 @@ public final class PetalEffect {
     }
 
     private static final class Petal {
-        /** The circling cherry leaf; null when petal-blade.show-orbiting-petals is off (the charge still exists). */
+        /** The circling cherry leaf. */
         private final ItemDisplay display;
         private final double offset;
 
@@ -103,11 +103,6 @@ public final class PetalEffect {
         this.deaths = deaths;
     }
 
-    /** {@code petal-blade.show-orbiting-petals}: whether priming shows petals circling the owner. */
-    private boolean showOrbiting() {
-        return plugin.getConfig().getBoolean("petal-blade.show-orbiting-petals", true);
-    }
-
     public boolean isActive(Player owner) {
         return swarms.containsKey(owner.getUniqueId());
     }
@@ -116,19 +111,16 @@ public final class PetalEffect {
     public void summon(Player owner, Callbacks callbacks) {
         if (isActive(owner)) return;
 
-        boolean show = showOrbiting();
         Swarm swarm = new Swarm(owner, callbacks);
         for (int i = 0; i < PETAL_COUNT; i++) {
             double offset = Math.PI * 2 * i / PETAL_COUNT;
-            swarm.petals.add(new Petal(show ? spawnDisplay(orbitPoint(owner, offset, 0)) : null, offset));
+            swarm.petals.add(new Petal(spawnDisplay(orbitPoint(owner, offset, 0)), offset));
         }
         swarms.put(owner.getUniqueId(), swarm);
 
-        if (show) {
-            World world = owner.getWorld();
-            world.playSound(owner.getLocation(), Sound.BLOCK_CHERRY_LEAVES_PLACE, SoundCategory.PLAYERS, 1.2f, 1.2f);
-            world.playSound(owner.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, SoundCategory.PLAYERS, 0.8f, 1.8f);
-        }
+        World world = owner.getWorld();
+        world.playSound(owner.getLocation(), Sound.BLOCK_CHERRY_LEAVES_PLACE, SoundCategory.PLAYERS, 1.2f, 1.2f);
+        world.playSound(owner.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, SoundCategory.PLAYERS, 0.8f, 1.8f);
 
         swarm.task = new BukkitRunnable() {
             @Override
@@ -158,7 +150,6 @@ public final class PetalEffect {
         Petal best = swarm.petals.get(0);
         double bestDot = -2;
         for (Petal petal : swarm.petals) {
-            if (petal.display == null) continue;
             Vector toPetal = petal.display.getLocation().toVector().subtract(eye.toVector());
             if (toPetal.lengthSquared() < 1.0E-6) continue;
             double dot = toPetal.normalize().dot(look);
@@ -169,11 +160,9 @@ public final class PetalEffect {
         }
         swarm.petals.remove(best);
 
-        // With no circling petals the thrown one starts just in front of the owner.
-        Location start = best.display != null
-                ? best.display.getLocation()
-                : eye.clone().add(look.clone().multiply(0.6)).subtract(0, 0.2, 0);
-        ItemDisplay thrown = best.display != null ? best.display : spawnDisplay(start);
+        // The thrown petal starts where it was circling.
+        ItemDisplay thrown = best.display;
+        Location start = thrown.getLocation();
         Vector velocity = aimPoint(owner, eye, look).subtract(start.toVector());
         if (velocity.lengthSquared() < 1.0) velocity = look.clone();
         velocity.normalize().multiply(THROW_SPEED);
@@ -208,7 +197,6 @@ public final class PetalEffect {
         if (swarms.remove(swarm.owner.getUniqueId(), swarm)) {
             swarm.task.cancel();
             for (Petal petal : swarm.petals) {
-                if (petal.display == null) continue;
                 Location at = petal.display.getLocation();
                 at.getWorld().spawnParticle(Particle.CHERRY_LEAVES, at, 6, 0.15, 0.15, 0.15, 0.02);
                 petal.display.remove();
@@ -222,14 +210,13 @@ public final class PetalEffect {
         Player owner = swarm.owner;
         double spin = swarm.age * ORBIT_STEP;
         for (Petal petal : swarm.petals) {
-            if (petal.display == null) continue; // orbiting petals are switched off in config.yml
             Location at = orbitPoint(owner, petal.offset + spin, swarm.age);
             petal.display.teleport(at);
             if (swarm.age % 3 == 0) {
                 at.getWorld().spawnParticle(Particle.DUST, at, 1, 0.05, 0.05, 0.05, 0.0, PINK_DUST);
             }
         }
-        if (swarm.age % 10 == 0 && !swarm.petals.isEmpty() && swarm.petals.get(0).display != null) {
+        if (swarm.age % 10 == 0 && !swarm.petals.isEmpty()) {
             Location any = swarm.petals.get(0).display.getLocation();
             any.getWorld().spawnParticle(Particle.CHERRY_LEAVES, any, 1, 0.2, 0.2, 0.2, 0.0);
         }

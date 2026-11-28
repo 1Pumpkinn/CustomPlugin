@@ -25,8 +25,8 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * /customplugin reload - re-reads config.yml. Weapon tiers, points, prices and the Hat / Petal Blade settings are read
- * from the config whenever they are used, so they apply straight away. (Resource pack and dropped-item beacon settings:
+ * /customplugin reload - re-reads config.yml. Weapon tiers, points and prices are read from the config whenever they
+ * are used, so they apply straight away. (Resource pack and dropped-item beacon settings:
  * use /weaponpack reload or restart.)
  *
  * <p>/customplugin reset - puts the default settings back, either everything or one section. Always asks for
@@ -36,7 +36,7 @@ public final class ReloadCommand implements CommandExecutor, TabCompleter {
 
     /** The sections of config.yml that can be reset on their own. */
     private static final List<String> SECTIONS = List.of(
-            "weapons", "weapon-limit", "shop", "hat", "petal-blade", "dropped-item-beacon", "resource-pack");
+            "weapons", "weapon-limit", "shop", "dropped-item-beacon", "resource-pack");
 
     private final JavaPlugin plugin;
 
@@ -49,7 +49,7 @@ public final class ReloadCommand implements CommandExecutor, TabCompleter {
         String action = args.length >= 1 ? args[0].toLowerCase(Locale.ROOT) : "";
         if (action.equals("reload")) {
             plugin.reloadConfig();
-            send(sender, "config.yml reloaded: weapon tiers, points, prices and the Hat and Petal Blade settings are live.",
+            send(sender, "config.yml reloaded: weapon tiers, points and prices are live.",
                     NamedTextColor.GREEN);
         } else if (action.equals("reset")) {
             reset(sender, label, args);

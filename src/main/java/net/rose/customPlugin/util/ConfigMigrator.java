@@ -13,13 +13,14 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Upgrades an older config.yml to the current layout. The old file is kept as config-backup-v1.yml, a fresh
- * commented config.yml is written, and every value the server owner had set is carried over (the old
+ * Upgrades an older config.yml to the current layout. The old file is kept as config-backup-v&lt;old version&gt;.yml, a
+ * fresh commented config.yml is written, and every value the server owner had set is carried over (the old
  * {@code weapon-limit.weapon-tiers.<id>} and {@code shop.<id>} entries become {@code weapons.<id>.tier / price}).
+ * Settings that no longer exist (version 3 dropped the {@code hat} and {@code petal-blade} sections) are left behind.
  */
 public final class ConfigMigrator {
 
-    public static final int CURRENT_VERSION = 2;
+    public static final int CURRENT_VERSION = 3;
 
     private static final Set<String> SHOP_NON_WEAPON_KEYS = Set.of("default-price");
 
@@ -31,10 +32,12 @@ public final class ConfigMigrator {
         File file = new File(plugin.getDataFolder(), "config.yml");
         // Read the raw file, without the defaults that come with the jar.
         YamlConfiguration old = YamlConfiguration.loadConfiguration(file);
-        if (old.getInt("config-version", 1) >= CURRENT_VERSION) return;
+        int oldVersion = old.getInt("config-version", 1);
+        if (oldVersion >= CURRENT_VERSION) return;
 
+        String backupName = "config-backup-v" + oldVersion + ".yml";
         try {
-            Files.copy(file.toPath(), new File(plugin.getDataFolder(), "config-backup-v1.yml").toPath(),
+            Files.copy(file.toPath(), new File(plugin.getDataFolder(), backupName).toPath(),
                     StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
             plugin.getLogger().warning("Could not back up the old config.yml, leaving it as it is: " + e.getMessage());
@@ -67,6 +70,6 @@ public final class ConfigMigrator {
         config.set("config-version", CURRENT_VERSION);
         plugin.saveConfig();
         plugin.getLogger().info("Upgraded config.yml to version " + CURRENT_VERSION
-                + " (the old one is saved as config-backup-v1.yml).");
+                + " (the old one is saved as " + backupName + ").");
     }
 }

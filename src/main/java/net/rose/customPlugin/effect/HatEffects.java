@@ -53,6 +53,14 @@ public final class HatEffects {
     private static final double PAD_HALF_WIDTH = 0.5;
     private static final double PAD_ZONE_HEIGHT = 0.45;     // feet inside this much above the floor count as "on it"
     private static final int BOUNCE_COOLDOWN_TICKS = 10;
+    /** Upward launch speed of a bounce, in blocks per tick (1.6 is roughly a 20+ block jump). */
+    private static final double VERTICAL_BOOST = 1.6;
+    /** Extra push in the direction the bouncer is facing, in blocks per tick. 0 = straight up. */
+    private static final double HORIZONTAL_BOOST = 1.4;
+    /** A bounce hat that has flown further than this many blocks from the thrower freezes in the air and works as a jump pad there. */
+    private static final double FREEZE_DISTANCE = 6.0;
+    /** How long the pad stays out once it has landed or frozen, in ticks (20 ticks = 1 second). */
+    private static final int PAD_LIFETIME_TICKS = 50;
     /** The most horizontal speed (blocks/tick) a bounce can leave someone with, so a big boost can't fling them out of the world. */
     private static final double MAX_HORIZONTAL_SPEED = 4.0;
     /** A pad frozen in mid-air catches things falling this far above it too (a fast fall covers a lot per tick). */
@@ -89,25 +97,6 @@ public final class HatEffects {
         this.plugin = plugin;
         this.hat = hat;
         this.deaths = deaths;
-    }
-
-    // ---- settings (hat.bounce.* in config.yml, read each time so /customplugin reload applies them) ----
-
-    private double verticalBoost() {
-        return Math.max(0.0, plugin.getConfig().getDouble("hat.bounce.vertical-boost", 1.6));
-    }
-
-    private double horizontalBoost() {
-        return Math.max(0.0, plugin.getConfig().getDouble("hat.bounce.horizontal-boost", 1.4));
-    }
-
-    /** Blocks from the thrower after which the bounce hat freezes in the air; 0 or less = never. */
-    private double freezeDistance() {
-        return plugin.getConfig().getDouble("hat.bounce.freeze-distance", 5.0);
-    }
-
-    private int padLifetimeTicks() {
-        return Math.max(1, plugin.getConfig().getInt("hat.bounce.lifetime-ticks", 50));
     }
 
     /** True while one of this player's thrown hats is still out (so a second one is not thrown at the same time). */
@@ -282,8 +271,6 @@ public final class HatEffects {
         private float spin = 0f;
 
         private final Location origin;
-        private final double freezeDistance;
-        private final int lifetimeTicks;
 
         private boolean landed = false;
         /** True when the hat stopped in mid-air instead of landing on a floor. */
@@ -299,8 +286,6 @@ public final class HatEffects {
             this.pos = start.clone();
             this.origin = start.clone();
             this.velocity = velocity;
-            this.freezeDistance = freezeDistance();
-            this.lifetimeTicks = padLifetimeTicks();
         }
 
         @Override
@@ -355,8 +340,8 @@ public final class HatEffects {
             }
             if (pos.getY() < world.getMinHeight()) return false;
 
-            // Flown further than freeze-distance without touching a floor: hang in the air right here.
-            if (freezeDistance > 0 && pos.distanceSquared(origin) > freezeDistance * freezeDistance) {
+            // Flown further than FREEZE_DISTANCE without touching a floor: hang in the air right here.
+            if (pos.distanceSquared(origin) > FREEZE_DISTANCE * FREEZE_DISTANCE) {
                 return freeze();
             }
 
@@ -368,7 +353,7 @@ public final class HatEffects {
         }
 
         private boolean rest() {
-            if (++restTicks > lifetimeTicks) {
+            if (++restTicks > PAD_LIFETIME_TICKS) {
                 int now = Bukkit.getCurrentTick();
                 lastBounce.values().removeIf(tick -> now - tick > 40);
                 world.playSound(new Location(world, landX, landY, landZ), Sound.BLOCK_SLIME_BLOCK_BREAK, 1f, 1.2f);
@@ -404,11 +389,11 @@ public final class HatEffects {
                 lastBounce.put(living.getUniqueId(), now);
 
                 Vector velocity = living.getVelocity();
-                velocity.setY(verticalBoost());
+                velocity.setY(VERTICAL_BOOST);
                 // Shove them the way they are facing, on top of whatever sideways speed they already have.
                 Vector facing = living.getLocation().getDirection().setY(0);
-                if (horizontalBoost() > 0 && facing.lengthSquared() > 1.0E-6) {
-                    Vector push = facing.normalize().multiply(horizontalBoost());
+                if (HORIZONTAL_BOOST > 0 && facing.lengthSquared() > 1.0E-6) {
+                    Vector push = facing.normalize().multiply(HORIZONTAL_BOOST);
                     double x = velocity.getX() + push.getX();
                     double z = velocity.getZ() + push.getZ();
                     double speed = Math.sqrt(x * x + z * z);
