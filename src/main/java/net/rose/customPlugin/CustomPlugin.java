@@ -43,6 +43,7 @@ public final class CustomPlugin extends JavaPlugin {
     private FrostEffects frostEffects;
     private WeaponLimit weaponLimit;
     private WeaponLimitNotifier limitNotifier;
+    private CombatListener combat;
 
     @Override
     public void onEnable() {
@@ -83,6 +84,8 @@ public final class CustomPlugin extends JavaPlugin {
         this.weaponLimit = new WeaponLimit(this, legendaries);
         this.limitNotifier = new WeaponLimitNotifier(this, weaponLimit);
         getServer().getPluginManager().registerEvents(new WeaponLimitListener(weaponLimit, limitNotifier), this);
+        this.combat = new CombatListener(this);
+        getServer().getPluginManager().registerEvents(combat, this);
         getServer().getPluginManager().registerEvents(new EgapListener(), this);
         getServer().getPluginManager().registerEvents(new StunListener(frostEffects), this);
         new LungeCooldown(this).register();
@@ -135,6 +138,7 @@ public final class CustomPlugin extends JavaPlugin {
     public void onDisable() {
         if (packManager != null) packManager.stop();
         if (limitNotifier != null) limitNotifier.shutdown();
+        if (combat != null) combat.shutdown();
         if (weaponLimit != null) weaponLimit.shutdown();
         if (cooldownBars != null) cooldownBars.shutdown();
         if (frostEffects != null) frostEffects.shutdown();

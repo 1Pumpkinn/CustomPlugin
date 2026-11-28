@@ -22,13 +22,13 @@
           "threshold": 0.9,
           "model": {
             "type": "minecraft:model",
-            "model": "customplugin:item/hunters_bow_pulling_2"
+            "model": "customplugin:item/hunters_bow_pulling_0"
           }
         }
       ],
       "fallback": {
         "type": "minecraft:model",
-        "model": "customplugin:item/hunters_bow_pulling_0"
+        "model": "customplugin:item/hunters_bow_pulling_2"
       }
     }
   }

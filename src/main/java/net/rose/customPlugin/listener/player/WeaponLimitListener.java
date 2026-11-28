@@ -2,7 +2,6 @@ package net.rose.customPlugin.listener.player;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.rose.customPlugin.item.Legendaries;
 import net.rose.customPlugin.item.WeaponLimit;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Trident;
@@ -37,9 +36,14 @@ public final class WeaponLimitListener implements Listener {
         this.notifier = notifier;
     }
 
-    private void tell(Player player, Legendaries.Weapon weapon) {
+    private void tell(Player player, WeaponLimit.Carried carried) {
+        if (carried.duplicate()) {
+            player.sendActionBar(Component.text(carried.weapon().name() + " is disabled: you already have one",
+                    NamedTextColor.RED));
+            return;
+        }
         int maxPoints = limit.maxPoints();
-        player.sendActionBar(Component.text(weapon.name() + " is disabled: weapon limit reached ("
+        player.sendActionBar(Component.text(carried.weapon().name() + " is disabled: weapon limit reached ("
                 + maxPoints + (maxPoints == 1 ? " point)" : " points)"), NamedTextColor.RED));
     }
 
@@ -52,7 +56,7 @@ public final class WeaponLimitListener implements Listener {
     @EventHandler(priority = EventPriority.LOWEST)
     public void onInteract(PlayerInteractEvent event) {
         if (event.getItem() == null || event.getHand() == null) return;
-        Legendaries.Weapon weapon = limit.disabledIn(event.getPlayer(), event.getHand());
+        WeaponLimit.Carried weapon = limit.disabledCarriedIn(event.getPlayer(), event.getHand());
         if (weapon == null) return;
 
         event.setUseItemInHand(Event.Result.DENY);
@@ -62,7 +66,7 @@ public final class WeaponLimitListener implements Listener {
     /** The offhand key is how most weapons are primed, so a disabled weapon in the main hand can't be swapped. */
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onSwapHand(PlayerSwapHandItemsEvent event) {
-        Legendaries.Weapon weapon = limit.disabledIn(event.getPlayer(), EquipmentSlot.HAND);
+        WeaponLimit.Carried weapon = limit.disabledCarriedIn(event.getPlayer(), EquipmentSlot.HAND);
         if (weapon == null) return;
 
         event.setCancelled(true);
@@ -73,7 +77,7 @@ public final class WeaponLimitListener implements Listener {
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onAttack(EntityDamageByEntityEvent event) {
         if (!(event.getDamager() instanceof Player player)) return;
-        Legendaries.Weapon weapon = limit.disabledIn(player, EquipmentSlot.HAND);
+        WeaponLimit.Carried weapon = limit.disabledCarriedIn(player, EquipmentSlot.HAND);
         if (weapon == null) return;
 
         event.setCancelled(true);
@@ -83,7 +87,7 @@ public final class WeaponLimitListener implements Listener {
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onShoot(EntityShootBowEvent event) {
         if (!(event.getEntity() instanceof Player player)) return;
-        Legendaries.Weapon weapon = limit.disabledIn(player, event.getHand());
+        WeaponLimit.Carried weapon = limit.disabledCarriedIn(player, event.getHand());
         if (weapon == null) return;
 
         event.setCancelled(true);
@@ -98,7 +102,7 @@ public final class WeaponLimitListener implements Listener {
         EquipmentSlot hand = player.getInventory().getItemInMainHand().isSimilar(thrown.getItemStack())
                 ? EquipmentSlot.HAND
                 : EquipmentSlot.OFF_HAND;
-        Legendaries.Weapon weapon = limit.disabledIn(player, hand);
+        WeaponLimit.Carried weapon = limit.disabledCarriedIn(player, hand);
         if (weapon == null) return;
 
         event.setCancelled(true);

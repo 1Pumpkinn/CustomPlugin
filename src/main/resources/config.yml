@@ -64,7 +64,7 @@ weapons:
     price: 32
   huntersbow:
     tier: 3
-    price: 8
+    price: 16
   zeusdisc:
     tier: 2
     price: 48
@@ -84,13 +84,17 @@ weapons:
 # Weapon points. Every custom weapon in a player's inventory costs points, depending on its tier (see weapons above).
 # When the weapons a player carries add up to more than max-points, the weapon that goes over is disabled: it can't
 # be used for its abilities or to attack until the player drops or gets rid of enough other weapons. Weapons are
-# counted from least to most expensive (equally expensive ones in the order the player picked them up), so the most
-# expensive weapon is the one that gets disabled.
+# counted in the order the player picked them up (oldest first), so the latest weapon that goes over the points is
+# the one that gets disabled.
+# A player also can't use two of the same weapon: the first copy they picked up works, every later copy is disabled
+# (and costs no points). Set allow-duplicates to true to allow it. Both only apply while enabled is true.
 # /weaponpoints opens a menu showing the weapons a player carries and how many points they are using.
 # Players with the customplugin.weaponlimit.bypass permission are not limited.
 weapon-limit:
   enabled: true
   max-points: 6
+  # Allow carrying (and using) more than one copy of the same weapon.
+  allow-duplicates: false
   # Points each tier costs. Add tiers freely (every tier used in weapons needs an entry here).
   tier-points:
     1: 3
@@ -111,3 +115,12 @@ shop:
     3: 2
   # Price for a tier that is not listed above.
   default-price: 5
+
+# Combat. A player who hits another player (or hits them with a weapon ability), or is hit by one, is in combat for
+# duration-seconds. While in combat they can't run commands. Dying ends it. Players with the
+# customplugin.combat.bypass permission are never put in combat and can always run commands.
+combat:
+  enabled: true
+  duration-seconds: 30
+  # Commands that still work in combat, without the slash (e.g. [msg, r]). Leave empty to block every command.
+  allowed-commands: []

@@ -33,7 +33,7 @@ import java.util.List;
 public final class HuntersBowListener extends AbilityListener<HuntersBow> {
 
     private static final int HIT_HIGHLIGHT_TICKS = 200;       // 10s on whatever the bow hit
-    private static final double PULSE_RANGE = 30.0;           // blocks around the shooter
+    private static final double PULSE_RANGE = 15.0;           // blocks around the shooter
     private static final int PULSE_HIGHLIGHT_TICKS = 160;     // 8s on everything the offhand reveals
 
     private static final long PULSE_COOLDOWN_MS = 30_000;

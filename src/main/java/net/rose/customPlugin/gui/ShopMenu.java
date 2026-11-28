@@ -131,7 +131,7 @@ public final class ShopMenu implements Listener {
         for (int i = 0; i < page.size() && i < WEAPONS_PER_ROW * WEAPON_ROWS; i++) {
             int slot = (1 + i / WEAPONS_PER_ROW) * 9 + 1 + i % WEAPONS_PER_ROW;
             holder.weaponAt.put(slot, page.get(i));
-            inventory.setItem(slot, icon(page.get(i), tokens, summary, limited));
+            inventory.setItem(slot, icon(page.get(i), tokens, summary, limited, limit.blocksDuplicates(player)));
         }
 
         int bottom = inventory.getSize() - 9;
@@ -183,6 +183,12 @@ public final class ShopMenu implements Listener {
         Legendaries.Weapon info = limit.identify(weapon);
         if (weapon == null || info == null) return;
 
+        if (limit.blocksDuplicates(player) && owns(limit.summarize(player), id)) {
+            player.sendActionBar(Component.text("You already have " + info.name(), NamedTextColor.RED));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
+            return;
+        }
+
         int price = priceOf(info);
         PlayerInventory inventory = player.getInventory();
         int tokens = killToken.count(inventory);
@@ -212,9 +218,14 @@ public final class ShopMenu implements Listener {
         populate(holder, player);
     }
 
+    /** Whether the player already carries this weapon. */
+    private static boolean owns(WeaponLimit.Summary summary, String id) {
+        return summary.weapons().stream().anyMatch(carried -> carried.weapon().id().equals(id));
+    }
+
     // ---- items ----------------------------------------------------------------------------------------------------
 
-    private ItemStack icon(String id, int tokens, WeaponLimit.Summary summary, boolean limited) {
+    private ItemStack icon(String id, int tokens, WeaponLimit.Summary summary, boolean limited, boolean noDuplicates) {
         ItemStack item = weapons.create(id);
         Legendaries.Weapon weapon = limit.identify(item);
 
@@ -232,11 +243,15 @@ public final class ShopMenu implements Listener {
                     .append(Component.text(" - " + (points == 1 ? "1 weapon point" : points + " weapon points"), NamedTextColor.GRAY)));
             lore.add(line("Price: ", NamedTextColor.GRAY)
                     .append(Component.text(format(price), affordable ? NamedTextColor.GREEN : NamedTextColor.RED)));
-            if (limited && summary.used() + points > summary.max()) {
-                lore.add(line("Over your weapon limit: it would be disabled", NamedTextColor.RED));
+            if (noDuplicates && owns(summary, id)) {
+                lore.add(line("You already have this weapon", NamedTextColor.RED));
+            } else {
+                if (limited && summary.used() + points > summary.max()) {
+                    lore.add(line("Over your weapon limit: it would be disabled", NamedTextColor.RED));
+                }
+                lore.add(line(affordable ? "Click to buy" : "Not enough kill tokens",
+                        affordable ? NamedTextColor.YELLOW : NamedTextColor.DARK_RED));
             }
-            lore.add(line(affordable ? "Click to buy" : "Not enough kill tokens",
-                    affordable ? NamedTextColor.YELLOW : NamedTextColor.DARK_RED));
         }
         item.lore(lore);
         return item;

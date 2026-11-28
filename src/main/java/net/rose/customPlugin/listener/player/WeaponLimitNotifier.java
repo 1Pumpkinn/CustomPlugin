@@ -55,10 +55,18 @@ public final class WeaponLimitNotifier {
         int maxPoints = limit.maxPoints();
         for (Player player : plugin.getServer().getOnlinePlayers()) {
             List<String> ids = new ArrayList<>();
-            List<Component> names = new ArrayList<>();
-            for (Legendaries.Weapon weapon : limit.disabledSlots(player).values()) {
-                ids.add(weapon.id());
-                names.add(Component.text(weapon.name(), weapon.color()));
+            List<Component> overNames = new ArrayList<>();
+            List<Component> duplicateNames = new ArrayList<>();
+            for (WeaponLimit.Carried carried : limit.disabledCarried(player).values()) {
+                Legendaries.Weapon weapon = carried.weapon();
+                Component name = Component.text(weapon.name(), weapon.color());
+                if (carried.duplicate()) {
+                    ids.add("duplicate:" + weapon.id());
+                    duplicateNames.add(name);
+                } else {
+                    ids.add(weapon.id());
+                    overNames.add(name);
+                }
             }
 
             List<String> before = notified.getOrDefault(player.getUniqueId(), List.of());
@@ -67,13 +75,25 @@ public final class WeaponLimitNotifier {
             if (ids.isEmpty()) {
                 notified.remove(player.getUniqueId());
                 player.sendMessage(Component.text("Weapon limit: all your weapons are active again.", NamedTextColor.GREEN));
-            } else {
-                notified.put(player.getUniqueId(), ids);
+                continue;
+            }
+            notified.put(player.getUniqueId(), ids);
+            if (!overNames.isEmpty()) {
                 player.sendMessage(Component.text("Weapon limit (" + maxPoints + (maxPoints == 1 ? " point" : " points")
                         + "): ", NamedTextColor.RED)
-                        .append(Component.join(JoinConfiguration.separator(Component.text(", ", NamedTextColor.GRAY)), names))
-                        .append(Component.text(ids.size() == 1 ? " is disabled." : " are disabled.", NamedTextColor.RED)));
+                        .append(join(overNames))
+                        .append(Component.text(overNames.size() == 1 ? " is disabled." : " are disabled.", NamedTextColor.RED)));
+            }
+            if (!duplicateNames.isEmpty()) {
+                player.sendMessage(Component.text("You can't use two of the same weapon: ", NamedTextColor.RED)
+                        .append(join(duplicateNames))
+                        .append(Component.text(duplicateNames.size() == 1 ? " (the extra copy) is disabled." : " (the extra copies) are disabled.",
+                                NamedTextColor.RED)));
             }
         }
+    }
+
+    private static Component join(List<Component> names) {
+        return Component.join(JoinConfiguration.separator(Component.text(", ", NamedTextColor.GRAY)), names);
     }
 }

@@ -65,3 +65,6 @@ permissions:
   customplugin.weaponlimit.bypass:
     description: Not affected by the weapon limit (weapon-limit in config.yml)
     default: false
+  customplugin.combat.bypass:
+    description: Never put in combat, and can always run commands (combat in config.yml)
+    default: false

@@ -118,7 +118,9 @@ public final class WeaponPointsMenu implements Listener {
         lore.add(Component.empty());
         lore.add(line("Tier " + limit.tierOf(carried.weapon()), NamedTextColor.GOLD)
                 .append(Component.text(" - " + format(carried.cost()), NamedTextColor.GRAY)));
-        lore.add(carried.disabled()
+        lore.add(carried.duplicate()
+                ? line("Disabled: you already have one", NamedTextColor.RED)
+                : carried.disabled()
                 ? line("Disabled: over your weapon limit", NamedTextColor.RED)
                 : line("Active", NamedTextColor.GREEN));
         item.lore(lore);
@@ -153,7 +155,10 @@ public final class WeaponPointsMenu implements Listener {
             lore.add(line("Tier " + tier.getKey() + " = " + format(tier.getValue()), NamedTextColor.GRAY));
         }
         if (limited) {
-            lore.add(line("The weapon that takes you over " + summary.max() + " is disabled", NamedTextColor.GRAY));
+            lore.add(line("The latest weapon that takes you over " + summary.max() + " is disabled", NamedTextColor.GRAY));
+            if (limit.blocksDuplicates(player)) {
+                lore.add(line("A second copy of a weapon is disabled", NamedTextColor.GRAY));
+            }
         } else {
             lore.add(line("You are not affected by the weapon limit", NamedTextColor.GRAY));
         }
