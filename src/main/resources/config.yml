@@ -63,8 +63,8 @@ weapons:
     tier: 2
     price: 32
   huntersbow:
-    tier: 2
-    price: 32
+    tier: 3
+    price: 8
   zeusdisc:
     tier: 2
     price: 48
