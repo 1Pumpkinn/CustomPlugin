@@ -125,4 +125,4 @@ combat:
   # Show the time left in combat on the action bar.
   action-bar: true
   # Commands that still work in combat, without the slash (e.g. [msg, r]). Leave empty to block every command.
-  allowed-commands: []
+  allowed-commands: [msg, gamemode,]
