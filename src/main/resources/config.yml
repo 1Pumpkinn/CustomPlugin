@@ -48,10 +48,10 @@ config-version: 2
 # =====================================================================================================================
 weapons:
   tideblade:
-    tier: 1
+    tier: 3
     price: 8
   petalblade:
-    tier: 1
+    tier: 3
     price: 16
   tempesttrident:
     tier: 2
@@ -126,6 +126,7 @@ hat:
 petal-blade:
   # Show the cherry-leaf petals circling the player (and the cherry leaf particles and sounds) after priming.
   # false = priming shows only the boss bar. Thrown petals are always visible.
+
   show-orbiting-petals: true
   cooldown-seconds: 30
 
