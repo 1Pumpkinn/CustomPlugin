@@ -50,16 +50,16 @@ weapon-limit:
     3: 1
   # Tier of each weapon, by its /weapon name.
   weapon-tiers:
-    zeusdisc: 1
+    zeusdisc: 2
     bloodthirstscythe: 1
-    tempesttrident: 1
-    tideblade: 2
+    tempesttrident: 2
+    tideblade: 1
     volcanicaxe: 2
-    frostspear: 2
+    frostspear: 1
     tricksterbow: 2
-    metalicmace: 3
-    petalblade: 3
-    hat: 3
+    metalicmace: 1
+    petalblade: 1
+    hat: 2
   # Tier for any weapon not listed in weapon-tiers (new weapons stay expensive until you place them).
   default-tier: 1
 
@@ -78,3 +78,14 @@ shop:
   # Optional per-weapon prices, by /weapon name (these win over tier-prices):
   # weapon-prices:
   #   zeusdisc: 10
+  tideblade: 8
+  petalblade: 16
+  tempesttrident: 24
+  hat: 32
+  tricksterbow: 32
+  zeusdisc: 48
+  frostspear: 48
+  volcanicaxe: 48
+  bloodthirstscythe: 72
+  metalicmace: 80
+

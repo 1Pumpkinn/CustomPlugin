@@ -10,6 +10,7 @@ import net.rose.customPlugin.listener.player.WeaponLimitListener;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Sound;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -24,31 +25,48 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 
 /**
- * /shop: every weapon with its price in kill tokens. Clicking a weapon takes the tokens out of the player's
- * inventory and gives them the weapon. Prices come from {@code shop} in config.yml (a price per tier, with an
- * optional price for single weapons). Buying has nothing to do with the weapon limit: a weapon bought past the limit
- * is simply disabled until the player has room for it (see {@link WeaponLimitListener}).
+ * /shop: weapons for sale in kill tokens, one page per tier (the tabs along the bottom row switch pages).
+ * Each page lists its weapons from the lowest price to the highest. Clicking a weapon takes the tokens out of the player's inventory and gives them the weapon.
+ *
+ * <p>Prices come from {@code shop} in config.yml. A weapon's price is, in order: {@code shop.weapon-prices.<id>},
+ * {@code shop.<id>} (the weapon's /weapon name straight under {@code shop}), then its tier's
+ * {@code shop.tier-prices.<tier>}, then {@code shop.default-price}. Buying has nothing to do with the weapon limit:
+ * a weapon bought past the limit is simply disabled until the player has room for it
+ * (see {@link WeaponLimitListener}).
  */
 public final class ShopMenu implements Listener {
 
+    private static final int ROWS = 5;                 // three rows of weapons and a bottom row for tabs and balance
     private static final int WEAPONS_PER_ROW = 7;
-    private static final int MAX_INNER_ROWS = 4;
+    private static final int WEAPON_ROWS = ROWS - 2;
+    private static final int MAX_TABS = 6;
     private static final int DEFAULT_PRICE = 5;
+
+    private static final Material[] TAB_ICONS = {
+            Material.NETHER_STAR, Material.DIAMOND, Material.GOLD_INGOT,
+            Material.IRON_INGOT, Material.COPPER_INGOT, Material.COAL};
 
     private final JavaPlugin plugin;
     private final WeaponRegistry weapons;
     private final WeaponLimitListener limit;
     private final KillToken killToken;
 
-    /** Marks an inventory as this menu and remembers which weapon sits in which slot. */
+    /** Marks an inventory as this menu and remembers its state: the tier on show and what sits in which slot. */
     private static final class Holder implements InventoryHolder {
         private Inventory inventory;
+        private final Map<String, Integer> tierOf = new LinkedHashMap<>(); // weapon id -> tier, in registry order
+        private final List<Integer> tiers = new ArrayList<>();             // tiers that have weapons, lowest first
+        private int tier;
         private final Map<Integer, String> weaponAt = new HashMap<>();
+        private final Map<Integer, Integer> tabAt = new HashMap<>();
 
         @Override
         public Inventory getInventory() {
@@ -63,33 +81,35 @@ public final class ShopMenu implements Listener {
         this.killToken = killToken;
     }
 
-    /** What a weapon costs in kill tokens: its own price in config.yml if it has one, otherwise its tier's price. */
+    /** What a weapon costs in kill tokens (see the class comment for where the price comes from). */
     public int priceOf(Legendaries.Weapon weapon) {
-        int tierPrice = plugin.getConfig().getInt("shop.tier-prices." + limit.tierOf(weapon),
-                plugin.getConfig().getInt("shop.default-price", DEFAULT_PRICE));
-        return Math.max(1, plugin.getConfig().getInt("shop.weapon-prices." + weapon.id(), tierPrice));
+        FileConfiguration config = plugin.getConfig();
+        int tierPrice = config.getInt("shop.tier-prices." + limit.tierOf(weapon),
+                config.getInt("shop.default-price", DEFAULT_PRICE));
+        int price = config.getInt("shop.weapon-prices." + weapon.id(), config.getInt("shop." + weapon.id(), tierPrice));
+        return Math.max(1, price);
     }
 
     public void open(Player player) {
-        List<String> ids = new ArrayList<>();
-        for (String id : weapons.ids()) {
-            if (ids.size() < WEAPONS_PER_ROW * MAX_INNER_ROWS) ids.add(id);
-        }
-        int innerRows = Math.max(1, (ids.size() + WEAPONS_PER_ROW - 1) / WEAPONS_PER_ROW);
-
         Holder holder = new Holder();
-        Inventory inventory = Bukkit.createInventory(holder, (innerRows + 2) * 9,
-                Component.text("Weapon Shop", NamedTextColor.DARK_GRAY));
-        holder.inventory = inventory;
-        for (int i = 0; i < ids.size(); i++) {
-            holder.weaponAt.put((1 + i / WEAPONS_PER_ROW) * 9 + 1 + i % WEAPONS_PER_ROW, ids.get(i));
+        for (String id : weapons.ids()) {
+            Legendaries.Weapon weapon = limit.identify(weapons.create(id));
+            if (weapon != null) holder.tierOf.put(id, limit.tierOf(weapon));
         }
+        for (int tier : new TreeSet<>(holder.tierOf.values())) {
+            if (holder.tiers.size() < MAX_TABS) holder.tiers.add(tier);
+        }
+        if (holder.tiers.isEmpty()) return;
+        holder.tier = holder.tiers.get(0);
+
+        Inventory inventory = Bukkit.createInventory(holder, ROWS * 9, Component.text("Weapon Shop", NamedTextColor.DARK_GRAY));
+        holder.inventory = inventory;
 
         populate(holder, player);
         player.openInventory(inventory);
     }
 
-    /** Fills (or refreshes) the menu: prices, what the player can afford, and their token balance. */
+    /** Fills (or refreshes) the menu for the tier on show: its weapons, the tabs and the player's token balance. */
     private void populate(Holder holder, Player player) {
         Inventory inventory = holder.inventory;
         int tokens = killToken.count(player.getInventory());
@@ -100,10 +120,34 @@ public final class ShopMenu implements Listener {
         for (int slot = 0; slot < inventory.getSize(); slot++) {
             inventory.setItem(slot, filler);
         }
-        for (Map.Entry<Integer, String> entry : holder.weaponAt.entrySet()) {
-            inventory.setItem(entry.getKey(), icon(entry.getValue(), tokens, summary, limited));
+
+        // This tier's weapons, cheapest first (weapons with the same price stay in registry order).
+        Map<String, Integer> prices = new HashMap<>();
+        for (Map.Entry<String, Integer> entry : holder.tierOf.entrySet()) {
+            if (entry.getValue() != holder.tier) continue;
+            Legendaries.Weapon weapon = limit.identify(weapons.create(entry.getKey()));
+            if (weapon != null) prices.put(entry.getKey(), priceOf(weapon));
         }
-        inventory.setItem(inventory.getSize() - 5, balanceItem(tokens, summary, limited));
+        List<String> page = new ArrayList<>();
+        for (String id : holder.tierOf.keySet()) {
+            if (prices.containsKey(id)) page.add(id);
+        }
+        page.sort(Comparator.comparingInt(prices::get));
+
+        holder.weaponAt.clear();
+        for (int i = 0; i < page.size() && i < WEAPONS_PER_ROW * WEAPON_ROWS; i++) {
+            int slot = (1 + i / WEAPONS_PER_ROW) * 9 + 1 + i % WEAPONS_PER_ROW;
+            holder.weaponAt.put(slot, page.get(i));
+            inventory.setItem(slot, icon(page.get(i), tokens, summary, limited));
+        }
+
+        int bottom = inventory.getSize() - 9;
+        holder.tabAt.clear();
+        for (int i = 0; i < holder.tiers.size(); i++) {
+            holder.tabAt.put(bottom + 1 + i, holder.tiers.get(i));
+            inventory.setItem(bottom + 1 + i, tab(holder, holder.tiers.get(i), i));
+        }
+        inventory.setItem(bottom + 8, balanceItem(tokens, summary, limited));
     }
 
     // ---- clicks ---------------------------------------------------------------------------------------------------
@@ -119,6 +163,16 @@ public final class ShopMenu implements Listener {
         ClickType click = event.getClick();
         if (click != ClickType.LEFT && click != ClickType.RIGHT
                 && click != ClickType.SHIFT_LEFT && click != ClickType.SHIFT_RIGHT) return;
+
+        Integer tab = holder.tabAt.get(event.getSlot());
+        if (tab != null) {
+            if (tab != holder.tier) {
+                holder.tier = tab;
+                populate(holder, player);
+                player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.6f, 1.2f);
+            }
+            return;
+        }
 
         String id = holder.weaponAt.get(event.getSlot());
         if (id != null) buy(player, holder, id);
@@ -192,6 +246,24 @@ public final class ShopMenu implements Listener {
                     affordable ? NamedTextColor.YELLOW : NamedTextColor.DARK_RED));
         }
         item.lore(lore);
+        return item;
+    }
+
+    /** One tab per tier along the bottom row; the tier on show glows. */
+    private ItemStack tab(Holder holder, int tier, int index) {
+        boolean selected = tier == holder.tier;
+        int count = (int) holder.tierOf.values().stream().filter(t -> t == tier).count();
+        int points = limit.pointsForTier(tier);
+
+        ItemStack item = new ItemStack(TAB_ICONS[index % TAB_ICONS.length]);
+        ItemMeta meta = item.getItemMeta();
+        meta.displayName(line("Tier " + tier, selected ? NamedTextColor.YELLOW : NamedTextColor.GOLD));
+        meta.lore(List.of(
+                line(count + (count == 1 ? " weapon" : " weapons"), NamedTextColor.GRAY),
+                line("Each costs " + (points == 1 ? "1 weapon point" : points + " weapon points"), NamedTextColor.GRAY),
+                line(selected ? "Viewing" : "Click to view", selected ? NamedTextColor.GREEN : NamedTextColor.YELLOW)));
+        meta.setEnchantmentGlintOverride(selected);
+        item.setItemMeta(meta);
         return item;
     }
 
