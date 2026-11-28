@@ -7,6 +7,12 @@ api-version: '1.21.11'
 load: POSTWORLD
 
 authors: [ PumpkinDev ]
+contributors:
+  - Vishini
+  - Magnet108
+  - Chapalulu
+
+
 
 commands:
   customplugin:
