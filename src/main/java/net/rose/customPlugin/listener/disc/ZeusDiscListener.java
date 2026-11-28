@@ -16,6 +16,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
@@ -89,6 +90,14 @@ public final class ZeusDiscListener implements Listener {
         event.setCancelled(true);
         if (player.getGameMode() == GameMode.SPECTATOR) return;
         throwDisc(player, hand);
+    }
+
+    /** Dropping the weapon cancels a primed ability, so its boss bar doesn't stay behind. */
+    @EventHandler(ignoreCancelled = true)
+    public void onDrop(PlayerDropItemEvent event) {
+        if (!disc.isZeusDisc(event.getItemDrop().getItemStack())) return;
+        Player player = event.getPlayer();
+        if (armed.remove(player.getUniqueId())) cooldowns.unprime(player, STRIKE_ID);
     }
 
     @EventHandler

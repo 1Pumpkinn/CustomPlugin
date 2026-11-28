@@ -122,25 +122,43 @@ public final class WeaponPointsMenu implements Listener {
                 ? line("Disabled: over your weapon limit", NamedTextColor.RED)
                 : line("Active", NamedTextColor.GREEN));
         item.lore(lore);
+        if (carried.disabled()) {
+            // Make a disabled weapon stand out at a glance: red "DISABLED" in front of its name.
+            Component name = item.effectiveName().decoration(TextDecoration.BOLD, false);
+            item.editMeta(meta -> meta.displayName(line("DISABLED ", NamedTextColor.RED)
+                    .decoration(TextDecoration.BOLD, true)
+                    .append(name)));
+        }
         return item;
     }
 
     private ItemStack balanceItem(Player player, WeaponLimitListener.Summary summary) {
         ItemStack item = new ItemStack(Material.GOLD_INGOT);
         ItemMeta meta = item.getItemMeta();
+        boolean limited = limit.isLimited(player);
+        int over = summary.total() - summary.max();
+        boolean isOver = limited && over > 0;
+        // Shows everything carried, so going over the limit reads as e.g. 7/6 (in red) instead of hiding the extra points.
         meta.displayName(line("Your weapon points: ", NamedTextColor.GOLD)
-                .append(Component.text(summary.used() + "/" + summary.max(), NamedTextColor.WHITE)));
+                .append(Component.text(summary.total() + "/" + summary.max(), isOver ? NamedTextColor.RED : NamedTextColor.WHITE)));
 
         List<Component> lore = new ArrayList<>();
+        if (isOver) {
+            lore.add(line("Over the limit by " + format(over), NamedTextColor.RED)
+                    .decoration(TextDecoration.BOLD, true));
+            lore.add(line(summary.used() + "/" + summary.max() + " points are active, the rest is disabled", NamedTextColor.RED));
+            lore.add(Component.empty());
+        }
         for (Map.Entry<Integer, Integer> tier : limit.tiers().entrySet()) {
             lore.add(line("Tier " + tier.getKey() + " = " + format(tier.getValue()), NamedTextColor.GRAY));
         }
-        if (limit.isLimited(player)) {
+        if (limited) {
             lore.add(line("The weapon that takes you over " + summary.max() + " is disabled", NamedTextColor.GRAY));
         } else {
             lore.add(line("You are not affected by the weapon limit", NamedTextColor.GRAY));
         }
         meta.lore(lore);
+        if (isOver) meta.setEnchantmentGlintOverride(true);
         item.setItemMeta(meta);
         return item;
     }

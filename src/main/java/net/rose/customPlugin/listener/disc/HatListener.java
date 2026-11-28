@@ -37,7 +37,6 @@ public final class HatListener implements Listener {
     /** How fast the thrown hat flies compared to the Zeus Disc (1.0). Lower is slower. */
     private static final double FLIGHT_SPEED_SCALE = 0.6;
 
-    private static final long PAD_COOLDOWN_MS = 20_000;
     private static final long RAZOR_COOLDOWN_MS = 25_000;
     private static final long RAZOR_MISS_COOLDOWN_MS = 8_000; // shorter when the razor hat hits nobody
 
@@ -144,7 +143,8 @@ public final class HatListener implements Listener {
             restore(player, taken, t);
             return;
         }
-        cooldowns.start(player, PAD_ID, "Bounce Hat", BossBar.Color.GREEN, PAD_COOLDOWN_MS);
+        long padCooldownMs = Math.max(0L, (long) (plugin.getConfig().getDouble("hat.bounce.cooldown-seconds", 20.0) * 1000));
+        cooldowns.start(player, PAD_ID, "Bounce Hat", BossBar.Color.GREEN, padCooldownMs);
     }
 
     private void throwRazor(Player player) {

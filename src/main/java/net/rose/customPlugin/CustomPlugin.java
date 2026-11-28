@@ -40,7 +40,9 @@ import net.rose.customPlugin.listener.sword.PetalBladeListener;
 import net.rose.customPlugin.listener.sword.TideBladeListener;
 import net.rose.customPlugin.listener.trident.TempestTridentListener;
 import net.rose.customPlugin.pack.ResourcePackManager;
+import net.rose.customPlugin.command.ReloadCommand;
 import net.rose.customPlugin.command.WeaponPackCommand;
+import net.rose.customPlugin.util.ConfigMigrator;
 import net.rose.customPlugin.util.CooldownBars;
 import net.rose.customPlugin.util.DeathMessages;
 import net.rose.customPlugin.util.TrueDamage;
@@ -76,8 +78,9 @@ public final class CustomPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        saveDefaultConfig();
-        // An older config.yml gets any new sections (like weapon-limit) added; values it already has are kept.
+        // Creates config.yml, and upgrades an older one to the current layout (the old file is backed up).
+        ConfigMigrator.run(this);
+        // A config.yml that is missing a setting gets it added; values it already has are kept.
         getConfig().options().copyDefaults(true);
         saveConfig();
         new TrueDamage(this); // registers its listener; ability damage ignores armor, enchants and resistance
@@ -125,7 +128,7 @@ public final class CustomPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(
                 new VolcanicAxeListener(volcanicAxe, cooldownBars, eruptionEffect, axeSpinEffect), this);
 
-        getServer().getPluginManager().registerEvents(new PetalBladeListener(petalBlade, cooldownBars, petalEffect), this);
+        getServer().getPluginManager().registerEvents(new PetalBladeListener(this, petalBlade, cooldownBars, petalEffect), this);
         getServer().getPluginManager().registerEvents(
                 new BloodthirstScytheListener(bloodthirstScythe, cooldownBars, new VampireSweepEffect(deathMessages)), this);
         getServer().getPluginManager().registerEvents(
@@ -141,6 +144,13 @@ public final class CustomPlugin extends JavaPlugin {
             WeaponPackCommand weaponPackCommand = new WeaponPackCommand(packManager);
             packCommand.setExecutor(weaponPackCommand);
             packCommand.setTabCompleter(weaponPackCommand);
+        }
+
+        PluginCommand reloadCommand = getCommand("customplugin");
+        if (reloadCommand != null) {
+            ReloadCommand reload = new ReloadCommand(this);
+            reloadCommand.setExecutor(reload);
+            reloadCommand.setTabCompleter(reload);
         }
 
         WeaponRegistry weaponRegistry = new WeaponRegistry(tideBlade, volcanicAxe, frostSpear, metalicMace, tricksterBow, zeusDisc, petalBlade, bloodthirstScythe, tempestTrident, hat);

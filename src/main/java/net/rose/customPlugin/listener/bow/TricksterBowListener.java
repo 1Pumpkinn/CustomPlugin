@@ -23,6 +23,7 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
@@ -200,6 +201,14 @@ public final class TricksterBowListener implements Listener {
         }
 
         TrueDamage.makeTrue(event);
+    }
+
+    /** Dropping the weapon cancels a primed ability, so its boss bar doesn't stay behind. */
+    @EventHandler(ignoreCancelled = true)
+    public void onDrop(PlayerDropItemEvent event) {
+        if (!bow.isTricksterBow(event.getItemDrop().getItemStack())) return;
+        Player player = event.getPlayer();
+        if (armed.remove(player.getUniqueId())) cooldowns.unprime(player, SHOT_ID);
     }
 
     @EventHandler

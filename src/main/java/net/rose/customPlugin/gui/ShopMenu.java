@@ -10,7 +10,6 @@ import net.rose.customPlugin.listener.player.WeaponLimitListener;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Sound;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -36,9 +35,8 @@ import java.util.TreeSet;
  * /shop: weapons for sale in kill tokens, one page per tier (the tabs along the bottom row switch pages).
  * Each page lists its weapons from the lowest price to the highest. Clicking a weapon takes the tokens out of the player's inventory and gives them the weapon.
  *
- * <p>Prices come from {@code shop} in config.yml. A weapon's price is, in order: {@code shop.weapon-prices.<id>},
- * {@code shop.<id>} (the weapon's /weapon name straight under {@code shop}), then its tier's
- * {@code shop.tier-prices.<tier>}, then {@code shop.default-price}. Buying has nothing to do with the weapon limit:
+ * <p>Prices come from config.yml (see WeaponSettings). A weapon's price is, in order: {@code weapons.<id>.price},
+ * then its tier's {@code shop.tier-prices.<tier>}, then {@code shop.default-price}. Buying has nothing to do with the weapon limit:
  * a weapon bought past the limit is simply disabled until the player has room for it
  * (see {@link WeaponLimitListener}).
  */
@@ -48,7 +46,6 @@ public final class ShopMenu implements Listener {
     private static final int WEAPONS_PER_ROW = 7;
     private static final int WEAPON_ROWS = ROWS - 2;
     private static final int MAX_TABS = 6;
-    private static final int DEFAULT_PRICE = 5;
 
     private static final Material[] TAB_ICONS = {
             Material.NETHER_STAR, Material.DIAMOND, Material.GOLD_INGOT,
@@ -83,11 +80,7 @@ public final class ShopMenu implements Listener {
 
     /** What a weapon costs in kill tokens (see the class comment for where the price comes from). */
     public int priceOf(Legendaries.Weapon weapon) {
-        FileConfiguration config = plugin.getConfig();
-        int tierPrice = config.getInt("shop.tier-prices." + limit.tierOf(weapon),
-                config.getInt("shop.default-price", DEFAULT_PRICE));
-        int price = config.getInt("shop.weapon-prices." + weapon.id(), config.getInt("shop." + weapon.id(), tierPrice));
-        return Math.max(1, price);
+        return limit.settings().price(weapon.id());
     }
 
     public void open(Player player) {
@@ -260,7 +253,7 @@ public final class ShopMenu implements Listener {
         meta.displayName(line("Tier " + tier, selected ? NamedTextColor.YELLOW : NamedTextColor.GOLD));
         meta.lore(List.of(
                 line(count + (count == 1 ? " weapon" : " weapons"), NamedTextColor.GRAY),
-                line("Each costs " + (points == 1 ? "1 weapon point" : points + " weapon points"), NamedTextColor.GRAY),
+                line("Costs " + (points == 1 ? "1 weapon point" : points + " weapon points") + " by default", NamedTextColor.GRAY),
                 line(selected ? "Viewing" : "Click to view", selected ? NamedTextColor.GREEN : NamedTextColor.YELLOW)));
         meta.setEnchantmentGlintOverride(selected);
         item.setItemMeta(meta);
@@ -276,7 +269,8 @@ public final class ShopMenu implements Listener {
         List<Component> lore = new ArrayList<>();
         lore.add(line("Players drop a kill token when they die", NamedTextColor.GRAY));
         if (limited) {
-            lore.add(line("Weapon points: " + summary.used() + "/" + summary.max() + " (see /weaponpoints)", NamedTextColor.GRAY));
+            lore.add(line("Weapon points: " + summary.total() + "/" + summary.max() + " (see /weaponpoints)",
+                    limited && summary.total() > summary.max() ? NamedTextColor.RED : NamedTextColor.GRAY));
         }
         meta.lore(lore);
         meta.setEnchantmentGlintOverride(true);

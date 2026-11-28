@@ -4,6 +4,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.JoinConfiguration;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.rose.customPlugin.item.Legendaries;
+import net.rose.customPlugin.item.WeaponSettings;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Trident;
@@ -56,9 +57,7 @@ public final class WeaponLimitListener implements Listener {
 
     private final JavaPlugin plugin;
     private final Legendaries legendaries;
-    private final boolean enabled;
-    private final int maxPoints;
-    private final int defaultTier;
+    private final WeaponSettings settings;
 
     /** The weapons (by id) each online player was last told are disabled, so a message only goes out on a change. */
     private final Map<UUID, List<String>> notified = new HashMap<>();
@@ -73,34 +72,37 @@ public final class WeaponLimitListener implements Listener {
     public WeaponLimitListener(JavaPlugin plugin, Legendaries legendaries) {
         this.plugin = plugin;
         this.legendaries = legendaries;
-        this.enabled = plugin.getConfig().getBoolean("weapon-limit.enabled", true);
-        this.maxPoints = Math.max(0, plugin.getConfig().getInt("weapon-limit.max-points", 6));
-        this.defaultTier = Math.max(1, plugin.getConfig().getInt("weapon-limit.default-tier", 1));
-        this.checkTask = enabled
-                ? plugin.getServer().getScheduler().runTaskTimer(plugin, this::checkAll, CHECK_INTERVAL_TICKS, CHECK_INTERVAL_TICKS)
-                : null;
+        this.settings = new WeaponSettings(plugin);
+        // Always scheduled: enabled / max-points are read from the config each time, so /customplugin reload applies them.
+        this.checkTask = plugin.getServer().getScheduler().runTaskTimer(plugin, this::checkAll, CHECK_INTERVAL_TICKS, CHECK_INTERVAL_TICKS);
     }
 
     public void shutdown() {
-        if (checkTask != null) checkTask.cancel();
+        checkTask.cancel();
         notified.clear();
         acquired.clear();
     }
 
     // ---- limit logic ----------------------------------------------------------------------------------------------
 
-    /** The tier a weapon is in ({@code weapon-limit.weapon-tiers.<id>}); weapons not listed use {@code default-tier}. */
+    /** Tier, points and price of every weapon, straight from config.yml ({@code weapons.<id>}). */
+    public WeaponSettings settings() {
+        return settings;
+    }
+
+    /** The tier a weapon is in ({@code weapons.<id>.tier}); weapons not listed use {@code weapon-limit.default-tier}. */
     public int tierOf(Legendaries.Weapon weapon) {
-        return Math.max(1, plugin.getConfig().getInt("weapon-limit.weapon-tiers." + weapon.id(), defaultTier));
+        return settings.tier(weapon.id());
     }
 
     /** What a tier costs ({@code weapon-limit.tier-points.<tier>}). */
     public int pointsForTier(int tier) {
-        return Math.max(0, plugin.getConfig().getInt("weapon-limit.tier-points." + tier, 1));
+        return settings.pointsForTier(tier);
     }
 
+    /** What one copy of the weapon costs in weapon points. */
     public int pointsOf(Legendaries.Weapon weapon) {
-        return pointsForTier(tierOf(weapon));
+        return settings.points(weapon.id());
     }
 
     /** Every tier from config.yml with its point cost, lowest tier first. */
@@ -122,8 +124,11 @@ public final class WeaponLimitListener implements Listener {
     public record Carried(Legendaries.Weapon weapon, int slot, int cost, boolean disabled) {
     }
 
-    /** What a player carries: points used by the active weapons, the limit, and every weapon in slot order. */
-    public record Summary(int used, int max, List<Carried> weapons) {
+    /**
+     * What a player carries: points used by the active weapons, the limit, the points of everything carried (disabled
+     * weapons included, so it can be over the limit), and every weapon in slot order.
+     */
+    public record Summary(int used, int max, int total, List<Carried> weapons) {
     }
 
     /** Which custom weapon a stack is, or null. */
@@ -132,16 +137,21 @@ public final class WeaponLimitListener implements Listener {
     }
 
     public int maxPoints() {
-        return maxPoints;
+        return Math.max(0, plugin.getConfig().getInt("weapon-limit.max-points", 6));
+    }
+
+    private boolean enabled() {
+        return plugin.getConfig().getBoolean("weapon-limit.enabled", true);
     }
 
     /** Whether the weapon limit applies to this player at all. */
     public boolean isLimited(Player player) {
-        return enabled && !player.hasPermission(BYPASS_PERMISSION);
+        return enabled() && !player.hasPermission(BYPASS_PERMISSION);
     }
 
     public Summary summarize(Player player) {
         boolean limited = isLimited(player);
+        int maxPoints = maxPoints();
 
         // Every weapon in slot order: hotbar, the rest of the inventory, then the offhand.
         PlayerInventory inventory = player.getInventory();
@@ -173,7 +183,9 @@ public final class WeaponLimitListener implements Listener {
         for (Carried carried : slotOrder) {
             result.add(new Carried(carried.weapon(), carried.slot(), carried.cost(), disabledSlots.contains(carried.slot())));
         }
-        return new Summary(used, maxPoints, result);
+        int total = 0;
+        for (Carried carried : slotOrder) total += carried.cost();
+        return new Summary(used, maxPoints, total, result);
     }
 
     /**
@@ -225,7 +237,7 @@ public final class WeaponLimitListener implements Listener {
     /** Inventory slot -> weapon, for every weapon the player carries that is over the limit. */
     private Map<Integer, Legendaries.Weapon> disabledSlots(Player player) {
         Map<Integer, Legendaries.Weapon> disabled = new LinkedHashMap<>();
-        if (!enabled) return disabled;
+        if (!enabled()) return disabled;
         for (Carried carried : summarize(player).weapons()) {
             if (carried.disabled()) disabled.put(carried.slot(), carried.weapon());
         }
@@ -234,7 +246,7 @@ public final class WeaponLimitListener implements Listener {
 
     /** The weapon in that hand if it is disabled, otherwise null. */
     private Legendaries.Weapon disabledIn(Player player, EquipmentSlot hand) {
-        if (!enabled) return null;
+        if (!enabled()) return null;
         if (hand != EquipmentSlot.HAND && hand != EquipmentSlot.OFF_HAND) return null;
         PlayerInventory inventory = player.getInventory();
         int slot = hand == EquipmentSlot.OFF_HAND ? OFFHAND_SLOT : inventory.getHeldItemSlot();
@@ -244,6 +256,7 @@ public final class WeaponLimitListener implements Listener {
     }
 
     private void tell(Player player, Legendaries.Weapon weapon) {
+        int maxPoints = maxPoints();
         player.sendActionBar(Component.text(weapon.name() + " is disabled: weapon limit reached ("
                 + maxPoints + (maxPoints == 1 ? " point)" : " points)"), NamedTextColor.RED));
     }
@@ -314,6 +327,11 @@ public final class WeaponLimitListener implements Listener {
 
     /** Once a second: tell players when the set of weapons that are disabled for them changes. */
     private void checkAll() {
+        if (!enabled()) {
+            notified.clear();
+            return;
+        }
+        int maxPoints = maxPoints();
         for (Player player : plugin.getServer().getOnlinePlayers()) {
             List<String> ids = new ArrayList<>();
             List<Component> names = new ArrayList<>();

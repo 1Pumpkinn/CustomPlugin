@@ -18,6 +18,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
@@ -112,6 +113,14 @@ public final class TempestTridentListener implements Listener {
                 thrower.getWorld().dropItemNaturally(thrower.getLocation(), leftover);
             }
         });
+    }
+
+    /** Dropping the weapon cancels a primed ability, so its boss bar doesn't stay behind. */
+    @EventHandler(ignoreCancelled = true)
+    public void onDrop(PlayerDropItemEvent event) {
+        if (!trident.isTempestTrident(event.getItemDrop().getItemStack())) return;
+        Player player = event.getPlayer();
+        if (armed.remove(player.getUniqueId())) cooldowns.unprime(player, THROW_ID);
     }
 
     @EventHandler

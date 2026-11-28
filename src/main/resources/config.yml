@@ -31,43 +31,74 @@ dropped-item-beacon:
   # How often the beam is redrawn. While blinking, every redraw switches the beam on or off, so this is half a blink.
   interval-ticks: 10
 
-# Weapon points. Every custom weapon in a player's inventory costs points, depending on its tier (tier 1 is the
-# highest and costs the most points, tier 3 the lowest). A tier costs the
-# points set in tier-points, and weapon-tiers says which tier each weapon is in. Add or rename tiers freely, as long
-# as every tier used in weapon-tiers has an entry in tier-points.
-#
+# Bumped by the plugin when this file's layout changes. Don't edit it. (An older config.yml is backed up to
+# config-backup-v1.yml and upgraded on startup; your values are carried over.)
+config-version: 2
+
+# After editing anything in this file run  /customplugin reload  (or restart). /customplugin reset puts the defaults back. No need to restart for tiers,
+# points, prices or the Hat / Petal Blade settings. Dropped-item beacon and resource-pack settings need
+# /weaponpack reload or a restart.
+
+# =====================================================================================================================
+# WEAPONS - the one place to change a weapon's tier and price.
+# The id is the weapon's /weapon name.
+#   tier:   1 = best / most expensive. What a tier costs in weapon points is set in weapon-limit.tier-points.
+#   price:  kill tokens it costs in /shop. Leave it out to use the tier's price (shop.tier-prices).
+#   points: weapon points it uses. Leave it out to use the tier's points (weapon-limit.tier-points).
+# =====================================================================================================================
+weapons:
+  tideblade:
+    tier: 1
+    price: 8
+  petalblade:
+    tier: 1
+    price: 16
+  tempesttrident:
+    tier: 2
+    price: 24
+  hat:
+    tier: 2
+    price: 32
+  tricksterbow:
+    tier: 2
+    price: 32
+  zeusdisc:
+    tier: 2
+    price: 48
+  frostspear:
+    tier: 1
+    price: 48
+  volcanicaxe:
+    tier: 2
+    price: 48
+  bloodthirstscythe:
+    tier: 1
+    price: 72
+  metalicmace:
+    tier: 1
+    price: 80
+
+# Weapon points. Every custom weapon in a player's inventory costs points, depending on its tier (see weapons above).
 # When the weapons a player carries add up to more than max-points, the weapon that goes over is disabled: it can't
 # be used for its abilities or to attack until the player drops or gets rid of enough other weapons. Weapons are
-# counted oldest first (the order the player picked them up in), so the newest weapon is the one
-# that gets disabled. /weaponpoints opens a menu showing the weapons a player carries and how many points they are
-# using. Players with the customplugin.weaponlimit.bypass permission are not limited.
+# counted oldest first (the order the player picked them up in), so the newest weapon is the one that gets disabled.
+# /weaponpoints opens a menu showing the weapons a player carries and how many points they are using.
+# Players with the customplugin.weaponlimit.bypass permission are not limited.
 weapon-limit:
   enabled: true
   max-points: 6
-  # Points each tier costs.
+  # Points each tier costs. Add tiers freely (every tier used in weapons needs an entry here).
   tier-points:
     1: 3
     2: 2
     3: 1
-  # Tier of each weapon, by its /weapon name.
-  weapon-tiers:
-    zeusdisc: 2
-    bloodthirstscythe: 1
-    tempesttrident: 2
-    tideblade: 1
-    volcanicaxe: 2
-    frostspear: 1
-    tricksterbow: 2
-    metalicmace: 1
-    petalblade: 1
-    hat: 2
-  # Tier for any weapon not listed in weapon-tiers (new weapons stay expensive until you place them).
+  # Tier for any weapon with no tier under weapons (new weapons stay expensive until you place them).
   default-tier: 1
 
-# /shop: weapons are bought with kill tokens (the red dye a player drops when they die in PvP). A weapon costs its
-# tier's price (tiers come from weapon-limit.weapon-tiers above); add a weapon's /weapon name under shop to give it its own
-# price instead, e.g. "zeusdisc: 10" (shop.weapon-prices.<name> works too). Buying has no effect on the weapon limit: a weapon bought past
-# weapon-limit.max-points is simply disabled until the player has the room for it.
+# /shop: weapons are bought with kill tokens (the red dye a player drops when they die in PvP).
+# A weapon's price is weapons.<id>.price if set, otherwise its tier's price below, otherwise default-price.
+# Buying has no effect on the weapon limit: a weapon bought past weapon-limit.max-points is simply disabled until
+# the player has the room for it.
 shop:
   # Kill tokens each tier costs.
   tier-prices:
@@ -76,14 +107,25 @@ shop:
     3: 2
   # Price for a tier that is not listed above.
   default-price: 5
-  # Per-weapon prices, by /weapon name (these win over tier-prices):
-  tideblade: 8
-  petalblade: 16
-  tempesttrident: 24
-  hat: 32
-  tricksterbow: 32
-  zeusdisc: 48
-  frostspear: 48
-  volcanicaxe: 48
-  bloodthirstscythe: 72
-  metalicmace: 80
+
+# Old Man's Hat. F (offhand key) throws the bounce hat; Crouch + F throws the razor hat.
+hat:
+  bounce:
+    # Upward launch speed, in blocks per tick (1.6 is roughly a 20+ block jump).
+    vertical-boost: 1.6
+    # Extra push in the direction the bouncer is facing, in blocks per tick. 0 = straight up.
+    horizontal-boost: 1.4
+    # A bounce hat that has flown further than this many blocks from the thrower freezes in the air
+    # and works as a jump pad right where it is. Set to 0 to turn this off.
+    freeze-distance: 5.0
+    # How long the pad stays out once it has landed or frozen, in ticks (20 ticks = 1 second).
+    lifetime-ticks: 50
+    cooldown-seconds: 20
+
+# Petal Blade.
+petal-blade:
+  # Show the cherry-leaf petals circling the player (and the cherry leaf particles and sounds) after priming.
+  # false = priming shows only the boss bar. Thrown petals are always visible.
+  show-orbiting-petals: true
+  cooldown-seconds: 30
+

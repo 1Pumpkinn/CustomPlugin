@@ -14,22 +14,25 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.plugin.java.JavaPlugin;
 
 public final class PetalBladeListener implements Listener, PetalEffect.Callbacks {
 
-    private static final long PETALS_COOLDOWN_MS = 30_000;
     private static final String PETALS_ID = "petal_blade";
 
+    private final JavaPlugin plugin;
     private final PetalBlade blade;
     private final CooldownBars cooldowns;
     private final PetalEffect petals;
 
-    public PetalBladeListener(PetalBlade blade, CooldownBars cooldowns, PetalEffect petals) {
+    public PetalBladeListener(JavaPlugin plugin, PetalBlade blade, CooldownBars cooldowns, PetalEffect petals) {
+        this.plugin = plugin;
         this.blade = blade;
         this.cooldowns = cooldowns;
         this.petals = petals;
@@ -77,6 +80,18 @@ public final class PetalBladeListener implements Listener, PetalEffect.Callbacks
         cooldowns.unprime(player, PETALS_ID);
     }
 
+    /** Dropping the blade ends the petals and takes the boss bar with it (the cooldown still counts). */
+    @EventHandler(ignoreCancelled = true)
+    public void onDrop(PlayerDropItemEvent event) {
+        if (!blade.isPetalBlade(event.getItemDrop().getItemStack())) return;
+        Player player = event.getPlayer();
+        if (!petals.isActive(player)) return;
+
+        petals.cancel(player);
+        cooldowns.unprime(player, PETALS_ID);
+        cooldowns.start(player, PETALS_ID, "Petal Blade", BossBar.Color.PINK, petalsCooldownMs());
+    }
+
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         cooldowns.resume(event.getPlayer());
@@ -88,7 +103,7 @@ public final class PetalBladeListener implements Listener, PetalEffect.Callbacks
         Player player = event.getPlayer();
         if (petals.isActive(player)) {
             petals.cancel(player);
-            cooldowns.start(player, PETALS_ID, "Petal Blade", BossBar.Color.PINK, PETALS_COOLDOWN_MS);
+            cooldowns.start(player, PETALS_ID, "Petal Blade", BossBar.Color.PINK, petalsCooldownMs());
         }
         cooldowns.hideAll(player);
     }
@@ -101,7 +116,7 @@ public final class PetalBladeListener implements Listener, PetalEffect.Callbacks
     @Override
     public void onSwarmEnded(Player owner) {
         cooldowns.unprime(owner, PETALS_ID);
-        cooldowns.start(owner, PETALS_ID, "Petal Blade", BossBar.Color.PINK, PETALS_COOLDOWN_MS);
+        cooldowns.start(owner, PETALS_ID, "Petal Blade", BossBar.Color.PINK, petalsCooldownMs());
     }
 
     private void summon(Player player) {
@@ -111,6 +126,11 @@ public final class PetalBladeListener implements Listener, PetalEffect.Callbacks
         petals.summon(player, this);
         cooldowns.prime(player, PETALS_ID, "Petal Blade", BossBar.Color.PINK);
         cooldowns.updatePrimed(player, PETALS_ID, primedTitle(PetalEffect.PETAL_COUNT), 1f);
+    }
+
+    /** {@code petal-blade.cooldown-seconds} from config.yml. */
+    private long petalsCooldownMs() {
+        return Math.max(0L, (long) (plugin.getConfig().getDouble("petal-blade.cooldown-seconds", 30.0) * 1000));
     }
 
     private static Component primedTitle(int remaining) {

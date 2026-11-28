@@ -49,13 +49,16 @@ public final class HatEffects {
     private static final double PAD_SPEED = 0.9;
     private static final double PAD_GRAVITY = 0.035;
     private static final int PAD_MAX_FLIGHT_TICKS = 80;
-    private static final int PAD_LIFETIME_TICKS = 50;       // 2.5s once landed
     private static final float PAD_SCALE = 1.4f;
     private static final double PAD_HALF_WIDTH = 0.5;
     private static final double PAD_ZONE_HEIGHT = 0.45;     // feet inside this much above the floor count as "on it"
-    private static final double BOUNCE_MIN = 1.6;          // launch velocity, blocks/tick
-    private static final double BOUNCE_MAX = 1.6;
     private static final int BOUNCE_COOLDOWN_TICKS = 10;
+    /** The most horizontal speed (blocks/tick) a bounce can leave someone with, so a big boost can't fling them out of the world. */
+    private static final double MAX_HORIZONTAL_SPEED = 4.0;
+    /** A pad frozen in mid-air catches things falling this far above it too (a fast fall covers a lot per tick). */
+    private static final double FROZEN_ZONE_BELOW = 1.2;
+    /** A pad frozen in mid-air only bounces things that are not already rising, so a rising player passes through it. */
+    private static final double FROZEN_MAX_RISE = 0.3;
     /** After a bounce, the fall that ends it (however long the flight) does no damage for this long. */
     private static final int BOUNCE_NO_FALL_TICKS = 200;
 
@@ -86,6 +89,25 @@ public final class HatEffects {
         this.plugin = plugin;
         this.hat = hat;
         this.deaths = deaths;
+    }
+
+    // ---- settings (hat.bounce.* in config.yml, read each time so /customplugin reload applies them) ----
+
+    private double verticalBoost() {
+        return Math.max(0.0, plugin.getConfig().getDouble("hat.bounce.vertical-boost", 1.6));
+    }
+
+    private double horizontalBoost() {
+        return Math.max(0.0, plugin.getConfig().getDouble("hat.bounce.horizontal-boost", 1.4));
+    }
+
+    /** Blocks from the thrower after which the bounce hat freezes in the air; 0 or less = never. */
+    private double freezeDistance() {
+        return plugin.getConfig().getDouble("hat.bounce.freeze-distance", 5.0);
+    }
+
+    private int padLifetimeTicks() {
+        return Math.max(1, plugin.getConfig().getInt("hat.bounce.lifetime-ticks", 50));
     }
 
     /** True while one of this player's thrown hats is still out (so a second one is not thrown at the same time). */
@@ -259,7 +281,13 @@ public final class HatEffects {
         private int ticks = 0;
         private float spin = 0f;
 
+        private final Location origin;
+        private final double freezeDistance;
+        private final int lifetimeTicks;
+
         private boolean landed = false;
+        /** True when the hat stopped in mid-air instead of landing on a floor. */
+        private boolean frozen = false;
         private double landX;
         private double landY;
         private double landZ;
@@ -269,12 +297,29 @@ public final class HatEffects {
             super(owner, display, stack, homeSlot);
             this.world = start.getWorld();
             this.pos = start.clone();
+            this.origin = start.clone();
             this.velocity = velocity;
+            this.freezeDistance = freezeDistance();
+            this.lifetimeTicks = padLifetimeTicks();
         }
 
         @Override
         boolean step() {
             return landed ? rest() : fly();
+        }
+
+        /** Stops the hat dead in the air where it is; it works as a jump pad from there. */
+        private boolean freeze() {
+            landed = true;
+            frozen = true;
+            landX = pos.getX();
+            landZ = pos.getZ();
+            landY = pos.getY() - 0.125 * PAD_SCALE; // the pad's "floor" sits just under the hat, like when it lands
+            pose(display, new Quaternionf().rotationY((float) Math.toRadians(spin)), new Vector3f(PAD_SCALE), null);
+            display.teleport(pos);
+            world.playSound(pos, Sound.BLOCK_SLIME_BLOCK_PLACE, 1f, 1.2f);
+            world.spawnParticle(Particle.ITEM_SLIME, pos, 10, 0.3, 0.2, 0.3, 0.0);
+            return true;
         }
 
         private boolean fly() {
@@ -310,6 +355,11 @@ public final class HatEffects {
             }
             if (pos.getY() < world.getMinHeight()) return false;
 
+            // Flown further than freeze-distance without touching a floor: hang in the air right here.
+            if (freezeDistance > 0 && pos.distanceSquared(origin) > freezeDistance * freezeDistance) {
+                return freeze();
+            }
+
             spin += 40f;
             pose(display, new Quaternionf().rotationY((float) Math.toRadians(spin)),
                     new Vector3f(PAD_SCALE), null);
@@ -318,7 +368,7 @@ public final class HatEffects {
         }
 
         private boolean rest() {
-            if (++restTicks > PAD_LIFETIME_TICKS) {
+            if (++restTicks > lifetimeTicks) {
                 int now = Bukkit.getCurrentTick();
                 lastBounce.values().removeIf(tick -> now - tick > 40);
                 world.playSound(new Location(world, landX, landY, landZ), Sound.BLOCK_SLIME_BLOCK_BREAK, 1f, 1.2f);
@@ -336,23 +386,38 @@ public final class HatEffects {
             lastBounce.values().removeIf(tick -> now - tick > 40);
             noFallUntil.values().removeIf(tick -> tick < now);
 
+            double below = frozen ? FROZEN_ZONE_BELOW : 0.1;
+            double half = frozen ? PAD_HALF_WIDTH + 0.25 : PAD_HALF_WIDTH;
             BoundingBox zone = new BoundingBox(
-                    landX - PAD_HALF_WIDTH, landY - 0.1, landZ - PAD_HALF_WIDTH,
-                    landX + PAD_HALF_WIDTH, landY + PAD_ZONE_HEIGHT, landZ + PAD_HALF_WIDTH);
+                    landX - half, landY - below, landZ - half,
+                    landX + half, landY + PAD_ZONE_HEIGHT, landZ + half);
 
             for (Entity entity : world.getNearbyEntities(zone, e -> e instanceof LivingEntity && !(e instanceof ArmorStand))) {
                 LivingEntity living = (LivingEntity) entity;
                 if (living instanceof Player player
                         && (player.isSneaking() || player.getGameMode() == GameMode.SPECTATOR)) continue;
 
+                if (frozen && living.getVelocity().getY() > FROZEN_MAX_RISE) continue;
+
                 Integer last = lastBounce.get(living.getUniqueId());
                 if (last != null && now - last < BOUNCE_COOLDOWN_TICKS) continue;
                 lastBounce.put(living.getUniqueId(), now);
 
-                // Harder landings bounce higher.
-                double strength = Math.max(BOUNCE_MIN, Math.min(BOUNCE_MAX, BOUNCE_MIN + living.getFallDistance() * 0.06));
                 Vector velocity = living.getVelocity();
-                velocity.setY(strength);
+                velocity.setY(verticalBoost());
+                // Shove them the way they are facing, on top of whatever sideways speed they already have.
+                Vector facing = living.getLocation().getDirection().setY(0);
+                if (horizontalBoost() > 0 && facing.lengthSquared() > 1.0E-6) {
+                    Vector push = facing.normalize().multiply(horizontalBoost());
+                    double x = velocity.getX() + push.getX();
+                    double z = velocity.getZ() + push.getZ();
+                    double speed = Math.sqrt(x * x + z * z);
+                    if (speed > MAX_HORIZONTAL_SPEED) {
+                        x *= MAX_HORIZONTAL_SPEED / speed;
+                        z *= MAX_HORIZONTAL_SPEED / speed;
+                    }
+                    velocity.setX(x).setZ(z);
+                }
                 living.setVelocity(velocity);
                 living.setFallDistance(0f);
                 noFallUntil.put(living.getUniqueId(), now + BOUNCE_NO_FALL_TICKS);

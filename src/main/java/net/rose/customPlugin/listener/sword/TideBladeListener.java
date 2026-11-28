@@ -16,6 +16,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
@@ -82,6 +83,14 @@ public final class TideBladeListener implements Listener {
         cooldowns.unprime(attacker, DROWN_ID);
         cooldowns.start(attacker, DROWN_ID, "Drown", BossBar.Color.BLUE, DROWN_COOLDOWN_MS);
         startDrowning(attacker, victim);
+    }
+
+    /** Dropping the weapon cancels a primed ability, so its boss bar doesn't stay behind. */
+    @EventHandler(ignoreCancelled = true)
+    public void onDrop(PlayerDropItemEvent event) {
+        if (!tideBlade.isTideBlade(event.getItemDrop().getItemStack())) return;
+        Player player = event.getPlayer();
+        if (armed.remove(player.getUniqueId())) cooldowns.unprime(player, DROWN_ID);
     }
 
     @EventHandler

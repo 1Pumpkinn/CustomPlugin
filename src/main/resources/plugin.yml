@@ -9,6 +9,11 @@ load: POSTWORLD
 authors: [ PumpkinDev ]
 
 commands:
+  customplugin:
+    description: Reload or reset config.yml (weapon tiers, prices, points, hat and petal settings)
+    usage: /customplugin <reload|reset>
+    permission: customplugin.reload
+
   weapon:
     description: Give yourself (or another player) a custom weapon
     usage: /weapon <name> [player]
@@ -33,6 +38,9 @@ commands:
     permission: customplugin.shop
 
 permissions:
+  customplugin.reload:
+    description: Allows /customplugin reload and reset
+    default: op
   customplugin.weapon:
     description: Allows use of /weapon
     default: op

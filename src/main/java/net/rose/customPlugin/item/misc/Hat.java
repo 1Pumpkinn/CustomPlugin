@@ -32,7 +32,7 @@ public final class Hat {
         ItemMeta meta = item.getItemMeta();
         meta.displayName(Component.text("Old Man's Hat", COLOR).decoration(TextDecoration.ITALIC, false));
         meta.lore(List.of(
-                ability("Right-click / Offhand", "Throw the hat down: it bounces anyone who lands on it for 2.5s"),
+                ability("Right-click / Offhand", "Throw the hat: it bounces anyone who touches it for a few seconds (thrown far, it hangs in the air as a jump pad)"),
                 ability("Crouch + Right-click / Offhand", "Throw the hat: if it hits someone it sticks to them and spins like a razor")
         ));
         meta.setMaxStackSize(1);
