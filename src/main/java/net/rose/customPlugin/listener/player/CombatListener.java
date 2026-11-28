@@ -38,18 +38,21 @@ public final class CombatListener implements Listener {
     private final JavaPlugin plugin;
     /** Player -> when their combat ends (System.currentTimeMillis). */
     private final Map<UUID, Long> combatEnds = new HashMap<>();
+    /** Player -> the last player who hit them, so a kill ends the killer's combat even when the death has no killer. */
+    private final Map<UUID, UUID> lastAttacker = new HashMap<>();
     private final BukkitTask task;
 
     public CombatListener(JavaPlugin plugin) {
         this.plugin = plugin;
         // Always scheduled: enabled / duration are read from the config each time, so /customplugin reload applies them.
-        this.task = plugin.getServer().getScheduler().runTaskTimer(plugin, this::checkExpired,
+        this.task = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick,
                 CHECK_INTERVAL_TICKS, CHECK_INTERVAL_TICKS);
     }
 
     public void shutdown() {
         task.cancel();
         combatEnds.clear();
+        lastAttacker.clear();
     }
 
     // ---- state ------------------------------------------------------------------------------------------------------
@@ -90,16 +93,37 @@ public final class CombatListener implements Listener {
         }
     }
 
-    private void checkExpired() {
+    /** Once a second: shows each player in combat their time left, and ends combat that has run out. */
+    private void tick() {
         long now = System.currentTimeMillis();
+        boolean actionBar = isEnabled() && plugin.getConfig().getBoolean("combat.action-bar", true);
         combatEnds.entrySet().removeIf(entry -> {
-            if (entry.getValue() > now) return false;
             Player player = plugin.getServer().getPlayer(entry.getKey());
-            if (player != null && isEnabled()) {
-                player.sendMessage(Component.text("You are no longer in combat.", NamedTextColor.GREEN));
+            if (entry.getValue() > now) {
+                if (actionBar && player != null) {
+                    int left = (int) Math.ceil((entry.getValue() - now) / 1000.0);
+                    player.sendActionBar(Component.text("In combat: ", NamedTextColor.RED)
+                            .append(Component.text(left + "s", NamedTextColor.WHITE)));
+                }
+                return false;
             }
+            if (player != null) announceEnd(player);
+            lastAttacker.remove(entry.getKey());
             return true;
         });
+    }
+
+    private void announceEnd(Player player) {
+        if (!isEnabled()) return;
+        if (plugin.getConfig().getBoolean("combat.action-bar", true)) {
+            player.sendActionBar(Component.text("You are no longer in combat", NamedTextColor.GREEN));
+        }
+        player.sendMessage(Component.text("You are no longer in combat.", NamedTextColor.GREEN));
+    }
+
+    /** Ends the player's combat right away. */
+    private void end(Player player) {
+        if (combatEnds.remove(player.getUniqueId()) != null) announceEnd(player);
     }
 
     // ---- tagging ----------------------------------------------------------------------------------------------------
@@ -116,6 +140,7 @@ public final class CombatListener implements Listener {
 
         tag(victim);
         tag(attacker);
+        lastAttacker.put(victim.getUniqueId(), attacker.getUniqueId());
     }
 
     private static Player attackerOf(EntityDamageByEntityEvent event) {
@@ -127,9 +152,18 @@ public final class CombatListener implements Listener {
         return null;
     }
 
+    /** Dying ends the victim's combat, and killing a player ends the killer's. */
     @EventHandler
     public void onDeath(PlayerDeathEvent event) {
-        combatEnds.remove(event.getEntity().getUniqueId());
+        Player victim = event.getEntity();
+        Player killer = victim.getKiller();
+        if (killer == null) {
+            UUID last = lastAttacker.get(victim.getUniqueId());
+            if (last != null) killer = plugin.getServer().getPlayer(last);
+        }
+        combatEnds.remove(victim.getUniqueId());
+        lastAttacker.remove(victim.getUniqueId());
+        if (killer != null && !killer.equals(victim)) end(killer);
     }
 
     // ---- blocking ---------------------------------------------------------------------------------------------------
