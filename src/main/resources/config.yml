@@ -31,7 +31,8 @@ dropped-item-beacon:
   # How often the beam is redrawn. While blinking, every redraw switches the beam on or off, so this is half a blink.
   interval-ticks: 10
 
-# Weapon points. Every custom weapon in a player's inventory costs points, depending on its tier. A tier costs the
+# Weapon points. Every custom weapon in a player's inventory costs points, depending on its tier (tier 1 is the
+# highest and costs the most points, tier 3 the lowest). A tier costs the
 # points set in tier-points, and weapon-tiers says which tier each weapon is in. Add or rename tiers freely, as long
 # as every tier used in weapon-tiers has an entry in tier-points.
 #
@@ -64,8 +65,8 @@ weapon-limit:
   default-tier: 1
 
 # /shop: weapons are bought with kill tokens (the red dye a player drops when they die in PvP). A weapon costs its
-# tier's price (tiers come from weapon-limit.weapon-tiers above); add a weapon to weapon-prices to give it its own
-# price instead, e.g. "zeusdisc: 10". Buying has no effect on the weapon limit: a weapon bought past
+# tier's price (tiers come from weapon-limit.weapon-tiers above); add a weapon's /weapon name under shop to give it its own
+# price instead, e.g. "zeusdisc: 10" (shop.weapon-prices.<name> works too). Buying has no effect on the weapon limit: a weapon bought past
 # weapon-limit.max-points is simply disabled until the player has the room for it.
 shop:
   # Kill tokens each tier costs.
@@ -75,9 +76,7 @@ shop:
     3: 2
   # Price for a tier that is not listed above.
   default-price: 5
-  # Optional per-weapon prices, by /weapon name (these win over tier-prices):
-  # weapon-prices:
-  #   zeusdisc: 10
+  # Per-weapon prices, by /weapon name (these win over tier-prices):
   tideblade: 8
   petalblade: 16
   tempesttrident: 24
@@ -88,4 +87,3 @@ shop:
   volcanicaxe: 48
   bloodthirstscythe: 72
   metalicmace: 80
-
