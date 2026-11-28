@@ -31,7 +31,7 @@ public final class TempestTrident {
                 .decoration(TextDecoration.ITALIC, false));
         meta.lore(List.of(
                 ability("Offhand", "Prime your next throw"),
-                ability("Throw", "The trident spins around the player it hits, damaging them every tick")
+                ability("Throw", "The trident spins around the player it hits for 3s, dealing 4 hearts of true damage")
         ));
         meta.setItemModel(key); // texture pack model: customplugin:<name>
         meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);

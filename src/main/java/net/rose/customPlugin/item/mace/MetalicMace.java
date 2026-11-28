@@ -28,7 +28,7 @@ public final class MetalicMace {
                 .decoration(TextDecoration.ITALIC, false));
         meta.lore(List.of(
                 ability("Offhand", "Pull a player or mob in with a chain"),
-                ability("Chain", "The pulled target is slowed for 5s and can't jump or use wind charges")
+                ability("Chain", "The pulled target is slowed for 8s and can't jump or use wind charges")
         ));
         meta.setItemModel(key); // texture pack model: customplugin:<name>
         meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);

@@ -6,6 +6,7 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.Registry;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -13,7 +14,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Puts every enchantment the item can take on it at its maximum level.
+ * Puts every enchantment the item can take on it at its maximum level, and hides the enchantment glint.
  *
  * <p>Curses and Knockback are skipped, and when two enchantments conflict (Sharpness/Smite, Infinity/Mending,
  * Loyalty/Riptide, Density/Breach...) the one listed first in {@link #PRIORITY} wins.
@@ -61,5 +62,10 @@ public final class MaxEnchants {
             item.addUnsafeEnchantment(enchantment, enchantment.getMaxLevel());
             applied.add(enchantment);
         }
+
+        // The enchantments stay, but the item does not shimmer: weapons are recognized by their model instead.
+        ItemMeta meta = item.getItemMeta();
+        meta.setEnchantmentGlintOverride(false);
+        item.setItemMeta(meta);
     }
 }

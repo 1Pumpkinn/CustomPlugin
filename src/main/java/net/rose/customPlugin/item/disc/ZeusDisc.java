@@ -32,7 +32,7 @@ public final class ZeusDisc {
                 ability("Offhand", "Prime your next throw to strike everything it hits with lightning"),
                 ability("Passive", "Hitting something near another target arcs sparks to nearby players and mobs for half a heart")
         ));
-        meta.setEnchantmentGlintOverride(true);
+        meta.setEnchantmentGlintOverride(false); // no enchant glint on any weapon
         meta.setItemModel(key); // texture pack model: customplugin:<name>
         meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
         item.setItemMeta(meta);

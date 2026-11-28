@@ -38,7 +38,7 @@ public final class TempestSpinEffect {
 
     private static final int DURATION_TICKS = 60;                     // 3s
     /** True damage per tick: 4 hearts (8 health) spread over the whole spin. */
-    private static final double TICK_DAMAGE = 4.0 / DURATION_TICKS;
+    private static final double TICK_DAMAGE = 8.0 / DURATION_TICKS;
     /** Gap between the victim's hitbox and the prong tips. */
     private static final double TIP_GAP = 0.6;
     private static final float TRIDENT_SCALE = 1.0f;

@@ -27,7 +27,7 @@ public final class TideBlade {
         meta.displayName(Component.text("Tide Blade", NamedTextColor.AQUA)
                 .decoration(TextDecoration.ITALIC, false));
         meta.lore(List.of(
-                ability("Offhand", "Drown the next player or mob you hit for 8s")
+                ability("Offhand", "Drown the next player or mob you hit for 8s: their air runs out, then they take 3.75 hearts of true damage")
         ));
         meta.setItemModel(key); // texture pack model: customplugin:<name>
         meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);

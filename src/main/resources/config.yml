@@ -16,31 +16,49 @@ resource-pack:
   # Text shown on the client's resource pack prompt.
   prompt: "CustomPlugin weapon textures"
 
-# Points are earned by killing players and spent in the weapon shop (/shop). Balances are kept in points.yml.
-points:
-  # Points the killer gets for every player kill (0 turns it off).
-  per-kill: 1
-
-shop:
-  # Price of every weapon in points, by its /weapon name. A negative price takes the weapon off the shop.
-  prices:
-    tideblade: 10
-    volcanicaxe: 10
-    frostspear: 10
-    metalicmace: 10
-    tricksterbow: 10
-    zeusdisc: 10
-    petalblade: 10
-    bloodthirstscythe: 10
-    tempesttrident: 10
-    hat: 10
-
-# Dropped weapons shoot a beam of particles into the sky so they can be spotted from far away.
+# Dropped weapons shoot a blinking beam of particles into the sky, in the weapon's own color (red for the scythe,
+# yellow for the Zeus Disc...), so they can be spotted from far away.
 dropped-item-beacon:
   enabled: true
+  # Blink the beam on and off instead of keeping it solid.
+  blink: true
   # How tall the beam is, in blocks.
-  height: 48
+  height: 64
   # Blocks between particles in the beam (bigger = fewer particles).
-  spacing: 2.0
-  # How often the beam is redrawn.
-  interval-ticks: 20
+  spacing: 1.5
+  # Size of each particle (0.5 - 4).
+  size: 2.5
+  # How often the beam is redrawn. While blinking, every redraw switches the beam on or off, so this is half a blink.
+  interval-ticks: 10
+
+# Weapon points. Every custom weapon in a player's inventory costs points, depending on its tier. A tier costs the
+# points set in tier-points, and weapon-tiers says which tier each weapon is in. Add or rename tiers freely, as long
+# as every tier used in weapon-tiers has an entry in tier-points.
+#
+# When the weapons a player carries add up to more than max-points, the weapon that goes over is disabled: it can't
+# be used for its abilities or to attack until the player drops or gets rid of enough other weapons. Slots are counted
+# in order (hotbar left to right, then the rest of the inventory, then the offhand), so the later weapon is the one
+# that gets disabled. /weaponpoints opens a menu showing the tiers and how many points a player is using. Players
+# with the customplugin.weaponlimit.bypass permission are not limited.
+weapon-limit:
+  enabled: true
+  max-points: 6
+  # Points each tier costs.
+  tier-points:
+    1: 3
+    2: 2
+    3: 1
+  # Tier of each weapon, by its /weapon name.
+  weapon-tiers:
+    zeusdisc: 1
+    bloodthirstscythe: 1
+    tempesttrident: 1
+    tideblade: 2
+    volcanicaxe: 2
+    frostspear: 2
+    tricksterbow: 2
+    metalicmace: 3
+    petalblade: 3
+    hat: 3
+  # Tier for any weapon not listed in weapon-tiers (new weapons stay expensive until you place them).
+  default-tier: 1

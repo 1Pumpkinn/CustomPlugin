@@ -19,7 +19,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 
-/** Every giveable weapon by its command name. Used by /weapon and the weapon shop. */
+/** Every giveable weapon by its command name. Used by /weapon and the lore refresher. */
 public final class WeaponRegistry {
 
     private final Map<String, Supplier<ItemStack>> weapons = new LinkedHashMap<>();

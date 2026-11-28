@@ -1,7 +1,7 @@
 package net.rose.customPlugin;
 
-import net.rose.customPlugin.command.PointsCommand;
-import net.rose.customPlugin.command.ShopCommand;
+import net.rose.customPlugin.command.WeaponPointsCommand;
+import net.rose.customPlugin.gui.WeaponPointsMenu;
 import net.rose.customPlugin.command.WeaponCommand;
 import net.rose.customPlugin.effect.HatEffects;
 import net.rose.customPlugin.effect.VampireSweepEffect;
@@ -38,8 +38,6 @@ import net.rose.customPlugin.listener.sword.PetalBladeListener;
 import net.rose.customPlugin.listener.sword.TideBladeListener;
 import net.rose.customPlugin.listener.trident.TempestTridentListener;
 import net.rose.customPlugin.pack.ResourcePackManager;
-import net.rose.customPlugin.shop.Points;
-import net.rose.customPlugin.shop.WeaponShop;
 import net.rose.customPlugin.command.WeaponPackCommand;
 import net.rose.customPlugin.util.CooldownBars;
 import net.rose.customPlugin.util.DeathMessages;
@@ -72,11 +70,14 @@ public final class CustomPlugin extends JavaPlugin {
     private HatEffects hatEffects;
     private HatListener hatListener;
     private DeathMessages deathMessages;
-    private Points points;
+    private WeaponLimitListener weaponLimit;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        // An older config.yml gets any new sections (like weapon-limit) added; values it already has are kept.
+        getConfig().options().copyDefaults(true);
+        saveConfig();
         new TrueDamage(this); // registers its listener; ability damage ignores armor, enchants and resistance
         this.killToken = new KillToken(this);
         this.tideBlade = new TideBlade(this);
@@ -101,7 +102,10 @@ public final class CustomPlugin extends JavaPlugin {
 
         getServer().getPluginManager().registerEvents(new KillTokenListener(killToken), this);
         getServer().getPluginManager().registerEvents(deathMessages, this);
-        getServer().getPluginManager().registerEvents(new LegendaryDeathListener(this, new Legendaries(this)), this);
+        Legendaries legendaries = new Legendaries(this);
+        getServer().getPluginManager().registerEvents(new LegendaryDeathListener(this, legendaries), this);
+        this.weaponLimit = new WeaponLimitListener(this, legendaries);
+        getServer().getPluginManager().registerEvents(weaponLimit, this);
         getServer().getPluginManager().registerEvents(new TideBladeListener(this, tideBlade, cooldownBars, deathMessages), this);
         getServer().getPluginManager().registerEvents(new EgapListener(), this);
         getServer().getPluginManager().registerEvents(new StunListener(frostEffects), this);
@@ -115,7 +119,7 @@ public final class CustomPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(zeusDiscListener, this);
         new LungeCooldown(this).register();
         getServer().getPluginManager().registerEvents(new MaceDamageCap(), this);
-        getServer().getPluginManager().registerEvents(new DroppedItemGlow(this, killToken), this);
+        getServer().getPluginManager().registerEvents(new DroppedItemGlow(this, killToken, legendaries), this);
         getServer().getPluginManager().registerEvents(
                 new VolcanicAxeListener(volcanicAxe, cooldownBars, eruptionEffect, axeSpinEffect), this);
 
@@ -145,27 +149,21 @@ public final class CustomPlugin extends JavaPlugin {
             command.setTabCompleter(weaponCommand);
         }
 
-        this.points = new Points(this);
-        WeaponShop weaponShop = new WeaponShop(this, weaponRegistry, points);
-        getServer().getPluginManager().registerEvents(weaponShop, this);
-        getServer().getPluginManager().registerEvents(new PointsListener(this, points), this);
+        // Weapons keep the lore they were created with, so give existing ones the current description.
+        getServer().getPluginManager().registerEvents(new WeaponLoreRefresher(weaponRegistry, legendaries), this);
 
-        PluginCommand shopCommand = getCommand("shop");
-        if (shopCommand != null) {
-            shopCommand.setExecutor(new ShopCommand(weaponShop));
-        }
-        PluginCommand pointsCommand = getCommand("points");
-        if (pointsCommand != null) {
-            PointsCommand pointsExecutor = new PointsCommand(points);
-            pointsCommand.setExecutor(pointsExecutor);
-            pointsCommand.setTabCompleter(pointsExecutor);
+        WeaponPointsMenu weaponPointsMenu = new WeaponPointsMenu(weaponRegistry, weaponLimit);
+        getServer().getPluginManager().registerEvents(weaponPointsMenu, this);
+        PluginCommand weaponPointsCommand = getCommand("weaponpoints");
+        if (weaponPointsCommand != null) {
+            weaponPointsCommand.setExecutor(new WeaponPointsCommand(weaponPointsMenu));
         }
     }
 
     @Override
     public void onDisable() {
         if (packManager != null) packManager.stop();
-        if (points != null) points.shutdown();
+        if (weaponLimit != null) weaponLimit.shutdown();
         if (zeusDiscListener != null) zeusDiscListener.shutdown();
         if (hatListener != null) hatListener.shutdown();
         if (cooldownBars != null) cooldownBars.shutdown();
